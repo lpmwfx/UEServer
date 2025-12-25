@@ -1,0 +1,94 @@
+# Changelog
+
+All notable changes to UEServer will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [Unreleased]
+
+### Added - 2025-12-26
+
+#### RPC Server (C++ Plugin)
+- Created UE5 plugin structure in `rpc/`
+  - `UEServer.uplugin` - Plugin descriptor with metadata
+  - `UEServer.Build.cs` - Build configuration with dependencies (Sockets, Networking, Json, JsonUtilities)
+  - `UEServer.h` - Public module header
+  - `UEServerModule.cpp` - Module implementation with startup/shutdown lifecycle
+  - `UEServerRPC.h` - RPC server interface
+  - `UEServerRPC.cpp` - RPC server implementation
+
+- Implemented TCP server with dynamic port allocation
+  - Binds to `127.0.0.1:0` (OS assigns available port)
+  - Writes `.ueserver/rpc.json` with runtime state (port, pid, started timestamp)
+  - Cleans up `.ueserver/rpc.json` on shutdown
+  - Runs in dedicated thread (`FRunnable` implementation)
+  - Non-blocking client connection handling
+
+- Implemented JSON RPC protocol
+  - Request format: `{"id": "...", "op": "...", ...params}`
+  - Response format: `{"id": "...", "op": "...", "ok": true/false, ...fields}`
+  - Error handling for invalid JSON
+
+- Implemented `ping` operation
+  - Request: `{"id": "req-001", "op": "ping"}`
+  - Response: `{"id": "req-001", "op": "ping", "ok": true, "version": "0.1.0"}`
+  - Used for health checks and server discovery
+
+#### Documentation
+- Created `rpc/README.md`
+  - Installation instructions (project plugin vs engine plugin)
+  - Usage guide and RPC protocol documentation
+  - Manual testing examples with netcat
+  - Architecture diagram
+  - Troubleshooting guide
+
+- Created `TODO` file
+  - Phase 1: RPC BRIDGE MVP task breakdown
+  - Success criteria definition
+  - Future phase planning
+
+- Created `CHANGELOG` (this file)
+
+### Technical Details
+
+**Port Discovery Mechanism:**
+- RPC server binds to port 0 for dynamic allocation
+- OS assigns available port (no conflicts between multiple UE5 instances)
+- Runtime state written to `.ueserver/rpc.json`:
+  ```json
+  {
+    "port": 45231,
+    "pid": 12345,
+    "started": "2025-12-26T10:30:00Z"
+  }
+  ```
+- Bridge CLI reads this file from CWD to discover server port
+- Stale file detection via PID validation
+
+**Security:**
+- Server always binds to localhost (127.0.0.1) only
+- No external network exposure
+- Future: TLS and authentication support planned
+
+**Compatibility:**
+- Unreal Engine 5.3+
+- Platforms: Windows, Linux, macOS
+
+### Status
+
+**Completed:**
+- ✅ UE5 plugin structure
+- ✅ TCP server with dynamic port allocation
+- ✅ JSON RPC protocol
+- ✅ Ping operation
+- ✅ Runtime state management (.ueserver/rpc.json)
+
+**Pending:**
+- ⏳ Manual testing with UE5 instance
+- ⏳ Python bridge CLI implementation
+- ⏳ MCP adapter implementation
+- ⏳ Additional RPC operations (UI inspection, control)
+
+---
+
+**Contributors**: TwistedBrain and Claude Sonnet 4.5
