@@ -1,71 +1,63 @@
 # UEServer TODO
 
-## Phase 1: RPC BRIDGE MVP
+## Phase 2: MCP Integration
 
-Goal: Get a minimal RPC server and bridge that can see each other with a simple ue-ping command.
+**Goal:** Create an MCP adapter that wraps the bridge CLI, enabling Claude Code and other MCP clients to interact with UE5.
 
-### RPC Server (C++ in UE5)
+### Architecture
+```
+Claude Code/MCP Client → (MCP protocol) → MCP Adapter → (stdio) → Bridge CLI → (TCP) → UE RPC Server
+```
 
-- [x] Create UE5 plugin structure in rpc/
-  - UEServer.uplugin
-  - Source directory structure
-  - Module setup (Public/Private headers)
+### MCP Adapter (Python with MCP SDK)
 
-- [x] Implement minimal TCP server
-  - Bind to port 0 (OS assigns available port)
-  - Write .ueserver/rpc.json with port/pid/started on startup
-  - Clean up .ueserver/rpc.json on shutdown
-  - Basic TCP connection handling
+- [ ] Create MCP server structure
+  - Package structure: mcp/ue_mcp/
+  - Setup MCP SDK dependencies
+  - Server entrypoint
 
-- [x] Add ping handler to RPC server
-  - Receive JSON over TCP: {"op":"ping"}
-  - Parse JSON request
-  - Send JSON response: {"ok":true,"version":"0.1.0","op":"ping"}
+- [ ] Implement bridge CLI wrapper
+  - Spawn bridge CLI as subprocess
+  - Communicate via stdio
+  - Parse JSON responses
+  - Error handling and logging
 
-- [ ] Test RPC server manually
-  - Start UE5 with plugin enabled
-  - Verify .ueserver/rpc.json is created
-  - Test with nc/telnet: echo '{"op":"ping"}' | nc localhost <port>
-  - Verify response is valid JSON
+- [ ] Define MCP tools
+  - Tool: ue_ping - Ping UE server
+  - Tool: ue_health - Health check
+  - Map to bridge CLI commands
 
-### Bridge CLI (Python with mypy)
+- [ ] MCP server lifecycle
+  - Initialize and start MCP server
+  - Handle client connections
+  - Graceful shutdown
+  - Resource cleanup
 
-- [x] Create Python bridge CLI structure
-  - Package structure: bridge/ue_bridge/
-  - Setup pyproject.toml with mypy
-  - Type definitions for RPC protocol
-  - CLI entrypoint
+- [ ] Testing
+  - Test MCP server with MCP inspector
+  - Test integration with Claude Code
+  - Verify all tools work correctly
+  - Test error cases
 
-- [x] Implement port discovery
-  - Read .ueserver/rpc.json from CWD
-  - Parse port/pid/started fields
-  - Validate PID (detect stale port files)
-  - Error handling if RPC server not running
+### Success Criteria
 
-- [x] Implement TCP client and ping command
-  - Create TCP connection to localhost:<port>
-  - Send ping JSON request
-  - Receive and parse JSON response
-  - CLI command: ue-bridge ue.ping
+Phase 2 is complete when:
+1. [ ] MCP server can be started and discovered by MCP clients
+2. [ ] ue_ping tool works via MCP
+3. [ ] ue_health tool works via MCP
+4. [ ] Error handling is robust
+5. [ ] Integration with Claude Code is verified
 
-- [ ] Test end-to-end
-  - Start UE5 with RPC server
-  - Run ue-bridge ue.ping from project directory
-  - Verify response shows ok=true and version
-  - Test error cases (server not running, stale port file)
+### Reference Implementation
 
-## Success Criteria
+See BlenderServer's MCP implementation at `/home/lpm/REPO/BlenderServer/mcp/` for:
+- MCP SDK usage patterns
+- Bridge CLI subprocess management
+- Tool definition structure
+- Error handling strategies
 
-MVP is complete when:
-1. ✅ UE5 plugin starts TCP server on dynamic port
-2. ✅ .ueserver/rpc.json is created with correct port info
-3. ✅ Bridge CLI can discover port and connect
-4. ⏳ `ue-bridge ue.ping` returns successful response (ready for testing)
-5. ⏳ Error handling works (server down, stale files) (ready for testing)
+### Next Steps After Phase 2
 
-## Next Phase (Future)
-
-- MCP adapter wrapper around bridge CLI
-- Additional RPC operations (list widgets, trigger actions)
-- UI inspection and control capabilities
-- Integration with Claude Code via MCP
+- Phase 3: UI Inspection (list widgets, get properties)
+- Phase 4: UI Control (trigger actions, update properties)
+- Phase 5: Advanced features (scripting, automation)

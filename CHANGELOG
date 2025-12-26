@@ -189,17 +189,66 @@ CLI Invocation → Port Discovery → TCP Client → UE RPC Server
 - ✅ CLI tool (ue.ping)
 - ✅ Type checking (mypy)
 
-**Pending (Next Session):**
-- ⏳ Manual testing with UE5 instance (UETRAIL project ready)
-- ⏳ End-to-end integration test (RPC server + bridge)
-- ⏳ MCP adapter implementation
-- ⏳ Additional RPC operations (UI inspection, control)
+### Added - 2025-12-26 (Session 3 - Phase 1 Complete!)
 
-**Session End**: 2025-12-26
-- RPC server implementation complete and ready for testing
-- Plugin installed in UETRAIL test project
-- Python bridge CLI complete with full type safety
-- Ready for end-to-end testing with UE5
+#### Port Discovery Update
+- Updated port discovery to read from `~/.ueserver/switchboard.json` (global)
+  - Changed from `.ueserver/rpc.json` in project directory
+  - Supports multiple UE5 instances running simultaneously
+  - Matches instance by project path
+  - Fallback to single instance if only one running
+
+#### Health Check Feature
+- Added `ue.health` tool with 500ms timeout
+  - Fast health check before longer operations
+  - Prevents infinite retry loops when server down
+  - Returns `{"ok": true, "status": "healthy"}` or error
+
+#### Timeout Configuration
+- Added `--timeout=MS` CLI parameter
+  - Configurable timeout for all operations
+  - Default: 2000ms (2 seconds)
+  - Example: `ue-bridge ue.ping --timeout=5000`
+
+#### Testing & Validation
+- Compiled UEServer plugin for UETRAIL project
+  - Symlinked plugin from `/home/lpm/REPO/UEServer/rpc` to UETRAIL
+  - Built with UE 5.7.1 build system
+  - Plugin loads successfully in editor
+
+- End-to-end testing completed ✅
+  - UE5 server starts on dynamic port (33051)
+  - `~/.ueserver/switchboard.json` created with instance info
+  - Raw TCP test: `echo '{"id":"test","op":"ping"}' | nc 127.0.0.1 33051` ✅
+  - Bridge ping: `ue-bridge ue.ping` ✅
+  - Bridge health: `ue-bridge ue.health` ✅
+  - Custom timeout: `ue-bridge ue.ping --timeout=5000` ✅
+
+#### Documentation
+- Updated CLI help text with new features
+- Updated port discovery documentation
+- Created `doc/DONE` to track completed work
+
+### Status - Phase 1: RPC BRIDGE MVP ✅
+
+**All Success Criteria Met:**
+1. ✅ UE5 plugin starts TCP server on dynamic port
+2. ✅ `~/.ueserver/switchboard.json` is created with correct port info
+3. ✅ Bridge CLI can discover port and connect
+4. ✅ `ue-bridge ue.ping` returns successful response
+5. ✅ Error handling works (server down, stale files)
+6. ✅ `ue-bridge ue.health` provides fast health checks (500ms timeout)
+7. ✅ Custom timeout support with --timeout parameter
+
+**Phase 1 Complete!** 🎉
+
+### Next: Phase 2 - MCP Integration
+
+**Goals:**
+- Create MCP adapter wrapping bridge CLI
+- Define MCP tools (ue_ping, ue_health)
+- Enable Claude Code integration
+- Reference BlenderServer MCP implementation
 
 ---
 

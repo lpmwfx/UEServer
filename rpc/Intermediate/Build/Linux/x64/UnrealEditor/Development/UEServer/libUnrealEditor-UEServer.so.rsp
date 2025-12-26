@@ -1,0 +1,8 @@
+"/home/lpm/REPO/UETRAIL/Plugins/UEServer/Intermediate/Build/Linux/x64/UnrealEditor/Development/UEServer/Module.UEServer.cpp.o"
+"/home/lpm/REPO/UETRAIL/Plugins/UEServer/Intermediate/Build/Linux/x64/UnrealEditor/Development/UEServer/UEServerModule.cpp.o"
+"/home/lpm/REPO/UETRAIL/Plugins/UEServer/Intermediate/Build/Linux/x64/UnrealEditor/Development/UEServer/UEServerRPC.cpp.o"
+-soname="libUnrealEditor-UEServer.so"
+-rpath-link="/home/lpm/REPO/UETRAIL/Plugins/UEServer/Binaries/Linux"
+-L"../Binaries/Linux"
+--start-group
+--end-group

@@ -88,37 +88,47 @@ UEServer transforms UE5 from a batch-scriptable tool into an **AI-interactive ru
 
 ## Port Discovery & Multi-Instance Support
 
-The RPC server uses **dynamic port allocation** to allow multiple UE5 instances to run simultaneously without port conflicts.
+The RPC server uses **dynamic port allocation** with a global switchboard to allow multiple UE5 instances to run simultaneously without port conflicts.
 
 ### Mechanism
 
 1. **RPC Server Startup**:
    - Binds to port 0 (OS assigns an available port)
-   - Writes runtime state to `.ueserver/rpc.json` in the project directory:
+   - Writes runtime state to `~/.ueserver/switchboard.json` (global):
      ```json
      {
-       "port": 45231,
-       "pid": 12345,
-       "started": "2025-12-25T23:45:00Z"
+       "instances": [
+         {
+           "pid": 12345,
+           "port": 45231,
+           "project": "/path/to/project.uproject",
+           "project_name": "MyProject",
+           "started": "2025-12-26T10:30:00Z"
+         }
+       ]
      }
      ```
 
 2. **Bridge Discovery**:
    - Bridge CLI runs from the UE5 project directory
-   - Reads `.ueserver/rpc.json` to discover the RPC server's port
-   - Connects to `localhost:<port>` for that specific project instance
+   - Reads `~/.ueserver/switchboard.json` to find all running instances
+   - Matches instance by project path to current working directory
+   - Falls back to single instance if only one is running
+   - Connects to `localhost:<port>` for matched instance
 
 3. **Cleanup**:
-   - RPC server removes `.ueserver/rpc.json` on clean shutdown
-   - Bridge can validate the PID to detect stale port files
-   - `.ueserver/` is gitignored (runtime state only)
+   - RPC server removes its instance from switchboard on clean shutdown
+   - Bridge validates PIDs to detect stale/crashed instances
+   - `~/.ueserver/` contains global runtime state for all UE instances
 
 ### Benefits
 
-- Multiple UE5 projects can run simultaneously without conflicts
+- Multiple UE5 projects run simultaneously without conflicts
+- Global view of all running UE instances in one place
 - Bridge automatically discovers the correct server instance
 - Works for both CLI-launched and GUI-launched UE5 instances
 - Simple file-based discovery (no additional services required)
+- Health check feature (500ms timeout) prevents infinite retry loops
 
 ## Data Flow
 
@@ -179,3 +189,58 @@ The BlenderServer codebase serves as a proven reference implementation for the b
 - Keep MCP thin and transport-focused; no duplicate business logic.
 - Use stable, explicit API contracts to avoid UI/engine coupling.
 - Favor clear logging and deterministic responses for automation.
+
+## Development Methodology: AI:DevOps
+
+This project is developed using **AI:DevOps** - a collaborative workflow where AI and human work together with clear role separation:
+
+### Roles
+
+**Human (System Designer & Architect)**:
+- Defines overall architecture and design principles
+- Makes strategic technical decisions
+- Identifies needs and requirements
+- Reviews and approves implementations
+- Manages project phases and priorities
+
+**AI (Developer & Advisor)**:
+- Implements code based on architecture
+- Suggests technical solutions and patterns
+- Writes documentation and tests
+- Refactors and optimizes code
+- Researches best practices and references
+
+### Phase-Based Workflow
+
+Development happens in **single-phase focus**:
+
+1. **Phase Definition**: Human defines phase goals based on needs and project description
+2. **Task Breakdown**: AI creates detailed TODO for current phase
+3. **Implementation**: AI implements with human guidance and approval
+4. **Testing**: AI tests thoroughly, human validates functionality
+5. **Phase Completion**: Move completed work to DONE, define next phase
+
+**No long-term roadmaps** - next phase emerges from:
+- Completed work (what's now possible)
+- Current needs (what's needed now)
+- Project description (overall vision)
+
+### Documentation-Driven Development
+
+All work is tracked through structured documentation:
+
+- **TODO**: Current phase tasks (what to do NOW)
+- **DONE**: Completed phases (what's been finished)
+- **RAG**: Research findings (what we learned)
+- **CHANGELOG**: Code changes (what changed in code)
+- **Project Description**: Vision and architecture (where we're going)
+
+See [doc/project-HOWTO.md](project-HOWTO.md) for detailed documentation workflow.
+
+### Benefits of AI:DevOps
+
+- **Fast Iteration**: AI codes while human focuses on design
+- **Knowledge Capture**: All decisions and findings documented
+- **Flexible Planning**: Adapt phases based on actual progress
+- **Quality Focus**: Human reviews, AI implements best practices
+- **Living Documentation**: Docs update with code changes

@@ -178,22 +178,31 @@ def _write_response(obj: dict[str, Any]) -> None:
 
 def _print_help() -> None:
     """Print concise CLI help."""
-    help_text = """ue-bridge <tool> [key=value ...]
+    help_text = """ue-bridge <tool> [key=value ...] [--timeout=MS]
 
 Examples:
   ue-bridge ue.ping
+  ue-bridge ue.health
+  ue-bridge ue.ping --timeout=5000
+
+Options:
+  --timeout=MS    Request timeout in milliseconds (default: 2000)
 
 Notes:
-  - UE Bridge discovers port from .ueserver/rpc.json in current directory
+  - UE Bridge discovers port from ~/.ueserver/switchboard.json
   - Start UE5 with UEServer plugin enabled first
   - Use ue-bridge from your UE5 project directory
+  - ue.health uses 500ms timeout for quick checks
 """
     print(help_text.strip())
 
 
-def create_context() -> ToolContext:
+def create_context(timeout_ms: int = 2000) -> ToolContext:
     """
     Create ToolContext by discovering port from .ueserver/rpc.json
+
+    Args:
+        timeout_ms: Request timeout in milliseconds (default: 2000)
 
     Returns:
         ToolContext with host, port, timeout
@@ -220,7 +229,7 @@ def create_context() -> ToolContext:
     context: ToolContext = {
         "host": "127.0.0.1",
         "port": port,
-        "timeout_ms": 2000,
+        "timeout_ms": timeout_ms,
     }
 
     return context
@@ -234,9 +243,28 @@ async def async_main() -> None:
             _print_help()
             return
 
+        # Parse timeout from args
+        timeout_ms = 2000
+        args = sys.argv[1:]
+        filtered_args = []
+
+        for arg in args:
+            if arg.startswith("--timeout="):
+                try:
+                    timeout_ms = int(arg.split("=", 1)[1])
+                except (ValueError, IndexError):
+                    print(
+                        json.dumps({"ok": False, "error": "Invalid --timeout value"}),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    sys.exit(1)
+            else:
+                filtered_args.append(arg)
+
         # Discover port first
-        ctx = create_context()
-        await cli_once(sys.argv[1:], ctx)
+        ctx = create_context(timeout_ms=timeout_ms)
+        await cli_once(filtered_args, ctx)
     else:
         # If running in a TTY with no args, show help.
         if sys.stdin.isatty():

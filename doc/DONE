@@ -1,0 +1,105 @@
+# UEServer - Completed Work
+
+## Phase 1: RPC BRIDGE MVP ✅
+
+**Completed:** 2025-12-26
+
+**Goal:** Get a minimal RPC server and bridge that can see each other with a simple ue-ping command.
+
+### RPC Server (C++ in UE5)
+
+- [x] Create UE5 plugin structure in rpc/
+  - UEServer.uplugin
+  - Source directory structure
+  - Module setup (Public/Private headers)
+
+- [x] Implement minimal TCP server
+  - Bind to port 0 (OS assigns available port)
+  - Write ~/.ueserver/switchboard.json with port/pid/started on startup
+  - Clean up on shutdown
+  - Basic TCP connection handling
+
+- [x] Add ping handler to RPC server
+  - Receive JSON over TCP: {"op":"ping"}
+  - Parse JSON request
+  - Send JSON response: {"ok":true,"version":"0.1.0","op":"ping"}
+
+- [x] Test RPC server manually
+  - Start UE5 with plugin enabled ✅
+  - Verify ~/.ueserver/switchboard.json is created ✅
+  - Test with nc/telnet: echo '{"id":"test","op":"ping"}' | nc localhost <port> ✅
+  - Verify response is valid JSON ✅
+
+### Bridge CLI (Python with mypy)
+
+- [x] Create Python bridge CLI structure
+  - Package structure: bridge/ue_bridge/
+  - Setup pyproject.toml with mypy
+  - Type definitions for RPC protocol
+  - CLI entrypoint
+
+- [x] Implement port discovery
+  - Read ~/.ueserver/switchboard.json
+  - Parse instances array and match to project
+  - Validate PID (detect stale port files)
+  - Error handling if RPC server not running
+  - Support for multiple UE instances
+
+- [x] Implement TCP client and ping command
+  - Create TCP connection to localhost:<port>
+  - Send ping JSON request
+  - Receive and parse JSON response
+  - CLI command: ue-bridge ue.ping
+
+- [x] Add health check and timeout features
+  - ue.health command with 500ms timeout
+  - --timeout parameter for configurable timeouts
+  - Fast fail when server not running
+
+- [x] Test end-to-end
+  - Start UE5 with RPC server ✅
+  - Run ue-bridge ue.ping from project directory ✅
+  - Run ue-bridge ue.health for quick checks ✅
+  - Verify response shows ok=true and version ✅
+  - Test error cases (server not running, stale port file) ✅
+  - Test custom timeout with --timeout parameter ✅
+
+### Success Criteria - All Met ✅
+
+1. ✅ UE5 plugin starts TCP server on dynamic port
+2. ✅ ~/.ueserver/switchboard.json is created with correct port info
+3. ✅ Bridge CLI can discover port and connect
+4. ✅ `ue-bridge ue.ping` returns successful response
+5. ✅ Error handling works (server down, stale files)
+6. ✅ `ue.health` provides fast health checks (500ms timeout)
+7. ✅ Custom timeout support with --timeout parameter
+
+### Key Deliverables
+
+**RPC Server (C++):**
+- `/home/lpm/REPO/UEServer/rpc/` - UE5 plugin
+- Port discovery via `~/.ueserver/switchboard.json`
+- TCP server on dynamic port
+- JSON-based RPC protocol
+
+**Bridge CLI (Python):**
+- `/home/lpm/REPO/UEServer/bridge/` - Python package
+- Port discovery from switchboard
+- Commands: `ue.ping`, `ue.health`
+- Configurable timeouts
+- Full type hints with mypy
+
+**Test Results:**
+```bash
+# Health check - 500ms timeout
+cd /home/lpm/REPO/UETRAIL && python3 -m ue_bridge ue.health
+{"tool": "ue.health", "ok": true, "status": "healthy", ...}
+
+# Ping - 2s timeout
+cd /home/lpm/REPO/UETRAIL && python3 -m ue_bridge ue.ping
+{"tool": "ue.ping", "ok": true, "version": "0.1.0", ...}
+
+# Raw TCP
+echo '{"id":"test-001","op":"ping"}' | nc 127.0.0.1 33051
+{"ok":true,"op":"ping","version":"0.1.0","id":"test-001"}
+```
