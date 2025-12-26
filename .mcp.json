@@ -1,0 +1,7 @@
+{
+  "ue-server": {
+    "command": "python",
+    "args": ["-m", "ue_mcp"],
+    "env": {}
+  }
+}

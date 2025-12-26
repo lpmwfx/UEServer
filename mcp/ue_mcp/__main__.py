@@ -4,7 +4,9 @@ import sys
 
 from .server import start_server
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Entry point for console script."""
     try:
         start_server()
     except KeyboardInterrupt:
@@ -12,3 +14,7 @@ if __name__ == "__main__":
     except Exception as err:
         print(f"Fatal error: {err}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
