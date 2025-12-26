@@ -11,9 +11,9 @@
  *
  * Responsibilities:
  * - Bind to dynamic port (OS assigns available port)
- * - Write .ueserver/rpc.json with port/pid/started on startup
+ * - Register in ~/.ueserver/switchboard.json on startup
  * - Accept TCP connections and process JSON RPC requests
- * - Clean up .ueserver/rpc.json on shutdown
+ * - Unregister from switchboard on shutdown
  */
 class UESERVER_API FUEServerRPC : public FRunnable
 {
@@ -42,11 +42,14 @@ private:
 	/** Create and bind the listener socket */
 	bool CreateListenerSocket();
 
-	/** Write runtime state to .ueserver/rpc.json */
-	bool WriteRuntimeState();
+	/** Register this instance in switchboard */
+	bool RegisterInSwitchboard();
 
-	/** Remove .ueserver/rpc.json */
-	void CleanupRuntimeState();
+	/** Unregister this instance from switchboard */
+	void UnregisterFromSwitchboard();
+
+	/** Get switchboard path (~/.ueserver/switchboard.json) */
+	FString GetSwitchboardPath() const;
 
 	/** Handle incoming client connection */
 	void HandleClient(FSocket* ClientSocket);
@@ -70,6 +73,12 @@ private:
 	/** Server thread */
 	FRunnableThread* Thread;
 
-	/** Path to .ueserver/rpc.json */
-	FString RuntimeStatePath;
+	/** Switchboard path (~/.ueserver/switchboard.json) */
+	FString SwitchboardPath;
+
+	/** Project path (can be empty if no project) */
+	FString ProjectPath;
+
+	/** Project name */
+	FString ProjectName;
 };

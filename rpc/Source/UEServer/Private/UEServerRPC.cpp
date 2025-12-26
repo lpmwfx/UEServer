@@ -19,9 +19,19 @@ FUEServerRPC::FUEServerRPC()
 	, bIsRunning(false)
 	, Thread(nullptr)
 {
-	// Runtime state path: <ProjectDir>/.ueserver/rpc.json
-	FString ProjectDir = FPaths::ProjectDir();
-	RuntimeStatePath = FPaths::Combine(ProjectDir, TEXT(".ueserver"), TEXT("rpc.json"));
+	// Switchboard path: ~/.ueserver/switchboard.json
+	SwitchboardPath = GetSwitchboardPath();
+
+	// Project info
+	ProjectPath = FPaths::GetProjectFilePath();
+	if (ProjectPath.IsEmpty())
+	{
+		ProjectName = TEXT("UnrealEditor");
+	}
+	else
+	{
+		ProjectName = FPaths::GetBaseFilename(ProjectPath);
+	}
 }
 
 FUEServerRPC::~FUEServerRPC()
@@ -44,11 +54,11 @@ bool FUEServerRPC::Start()
 		return false;
 	}
 
-	// Write runtime state
-	if (!WriteRuntimeState())
+	// Register in switchboard
+	if (!RegisterInSwitchboard())
 	{
-		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to write runtime state"));
-		CleanupRuntimeState();
+		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to register in switchboard"));
+		UnregisterFromSwitchboard();
 		return false;
 	}
 
@@ -79,8 +89,8 @@ void FUEServerRPC::Stop()
 		Thread = nullptr;
 	}
 
-	// Cleanup
-	CleanupRuntimeState();
+	// Unregister from switchboard
+	UnregisterFromSwitchboard();
 
 	UE_LOG(LogTemp, Log, TEXT("UEServerRPC: Stopped"));
 }
@@ -191,51 +201,151 @@ bool FUEServerRPC::CreateListenerSocket()
 	return true;
 }
 
-bool FUEServerRPC::WriteRuntimeState()
+FString FUEServerRPC::GetSwitchboardPath() const
 {
-	// Create .ueserver directory if it doesn't exist
-	FString UEServerDir = FPaths::GetPath(RuntimeStatePath);
+	// ~/.ueserver/switchboard.json
+	FString UserHomeDir = FPlatformProcess::UserHomeDir();
+	return FPaths::Combine(UserHomeDir, TEXT(".ueserver"), TEXT("switchboard.json"));
+}
+
+bool FUEServerRPC::RegisterInSwitchboard()
+{
+	// Create ~/.ueserver directory if needed
+	FString UEServerDir = FPaths::GetPath(SwitchboardPath);
 	if (!FPaths::DirectoryExists(UEServerDir))
 	{
 		if (!IFileManager::Get().MakeDirectory(*UEServerDir, true))
 		{
-			UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to create .ueserver directory"));
+			UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to create ~/.ueserver directory"));
 			return false;
 		}
 	}
 
-	// Build JSON
-	TSharedPtr<FJsonObject> JsonObject = MakeShared<FJsonObject>();
-	JsonObject->SetNumberField(TEXT("port"), Port);
-	JsonObject->SetNumberField(TEXT("pid"), FPlatformProcess::GetCurrentProcessId());
-	JsonObject->SetStringField(TEXT("started"), FDateTime::UtcNow().ToIso8601());
-
-	// Serialize to string
-	FString OutputString;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
-	if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+	// Read existing switchboard (or create new)
+	TArray<TSharedPtr<FJsonValue>> Instances;
+	if (FPaths::FileExists(SwitchboardPath))
 	{
-		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to serialize runtime state JSON"));
+		FString JsonString;
+		if (FFileHelper::LoadFileToString(JsonString, *SwitchboardPath))
+		{
+			TSharedPtr<FJsonObject> JsonObject;
+			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonString);
+			if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+			{
+				const TArray<TSharedPtr<FJsonValue>>* ExistingInstances = nullptr;
+				if (JsonObject->TryGetArrayField(TEXT("instances"), ExistingInstances))
+				{
+					Instances = *ExistingInstances;
+				}
+			}
+		}
+	}
+
+	// Remove stale entries for this PID (in case of crash recovery)
+	int32 CurrentPid = FPlatformProcess::GetCurrentProcessId();
+	Instances.RemoveAll([CurrentPid](const TSharedPtr<FJsonValue>& Value) {
+		const TSharedPtr<FJsonObject>* ObjPtr;
+		if (Value->TryGetObject(ObjPtr) && ObjPtr->IsValid())
+		{
+			int32 Pid = (*ObjPtr)->GetIntegerField(TEXT("pid"));
+			return Pid == CurrentPid;
+		}
+		return false;
+	});
+
+	// Add new instance
+	TSharedPtr<FJsonObject> NewInstance = MakeShared<FJsonObject>();
+	NewInstance->SetNumberField(TEXT("pid"), CurrentPid);
+	NewInstance->SetNumberField(TEXT("port"), Port);
+	if (ProjectPath.IsEmpty())
+	{
+		NewInstance->SetField(TEXT("project"), MakeShared<FJsonValueNull>());
+	}
+	else
+	{
+		NewInstance->SetStringField(TEXT("project"), ProjectPath);
+	}
+	NewInstance->SetStringField(TEXT("project_name"), ProjectName);
+	NewInstance->SetStringField(TEXT("started"), FDateTime::UtcNow().ToIso8601());
+
+	Instances.Add(MakeShared<FJsonValueObject>(NewInstance));
+
+	// Build switchboard JSON
+	TSharedPtr<FJsonObject> Switchboard = MakeShared<FJsonObject>();
+	Switchboard->SetArrayField(TEXT("instances"), Instances);
+
+	// Serialize (compact JSON)
+	FString OutputString;
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+	if (!FJsonSerializer::Serialize(Switchboard.ToSharedRef(), Writer))
+	{
+		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to serialize switchboard JSON"));
 		return false;
 	}
 
 	// Write to file
-	if (!FFileHelper::SaveStringToFile(OutputString, *RuntimeStatePath))
+	if (!FFileHelper::SaveStringToFile(OutputString, *SwitchboardPath))
 	{
-		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to write runtime state file"));
+		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Failed to write switchboard file"));
 		return false;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("UEServerRPC: Runtime state written to %s"), *RuntimeStatePath);
+	UE_LOG(LogTemp, Log, TEXT("UEServerRPC: Registered in switchboard: %s (port %d)"), *ProjectName, Port);
 	return true;
 }
 
-void FUEServerRPC::CleanupRuntimeState()
+void FUEServerRPC::UnregisterFromSwitchboard()
 {
-	if (FPaths::FileExists(RuntimeStatePath))
+	if (!FPaths::FileExists(SwitchboardPath))
 	{
-		IFileManager::Get().Delete(*RuntimeStatePath);
-		UE_LOG(LogTemp, Log, TEXT("UEServerRPC: Removed runtime state file"));
+		return;
+	}
+
+	// Read switchboard
+	FString JsonString;
+	if (!FFileHelper::LoadFileToString(JsonString, *SwitchboardPath))
+	{
+		return;
+	}
+
+	TSharedPtr<FJsonObject> JsonObject;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonString);
+	if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
+	{
+		return;
+	}
+
+	// Remove this instance
+	const TArray<TSharedPtr<FJsonValue>>* ExistingInstances = nullptr;
+	if (!JsonObject->TryGetArrayField(TEXT("instances"), ExistingInstances))
+	{
+		return;
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Instances = *ExistingInstances;
+	int32 CurrentPid = FPlatformProcess::GetCurrentProcessId();
+
+	Instances.RemoveAll([CurrentPid](const TSharedPtr<FJsonValue>& Value) {
+		const TSharedPtr<FJsonObject>* ObjPtr;
+		if (Value->TryGetObject(ObjPtr) && ObjPtr->IsValid())
+		{
+			int32 Pid = (*ObjPtr)->GetIntegerField(TEXT("pid"));
+			return Pid == CurrentPid;
+		}
+		return false;
+	});
+
+	// Write back
+	JsonObject->SetArrayField(TEXT("instances"), Instances);
+
+	FString OutputString;
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+	if (FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+	{
+		FFileHelper::SaveStringToFile(OutputString, *SwitchboardPath);
+		UE_LOG(LogTemp, Log, TEXT("UEServerRPC: Unregistered from switchboard"));
 	}
 }
 

@@ -17,8 +17,8 @@
 	"Modules": [
 		{
 			"Name": "UEServer",
-			"Type": "Runtime",
-			"LoadingPhase": "Default",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "PreDefault",
 			"PlatformAllowList": [
 				"Win64",
 				"Linux",
