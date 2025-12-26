@@ -1,0 +1,5 @@
+# MCP SDK
+mcp>=0.9.0
+
+# Bridge dependency (local)
+-e ../bridge

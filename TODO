@@ -2,12 +2,23 @@
 
 ## Phase 2: MCP Integration
 
-**Goal:** Create an MCP adapter that wraps the bridge CLI, enabling Claude Code and other MCP clients to interact with UE5.
+**Goal:** Create a thin MCP adapter that wraps the bridge CLI, enabling Claude Code and other MCP clients to interact with UE5.
 
-### Architecture
+**Important:** We're now on git branch `mcp` - Phase 1 MVP is complete and stable on main.
+
+### Architecture & Logic Distribution
+
 ```
 Claude Code/MCP Client → (MCP protocol) → MCP Adapter → (stdio) → Bridge CLI → (TCP) → UE RPC Server
+                                            [THIN]                   [LOGIC]              [LOGIC]
 ```
+
+**Logic Distribution:**
+- **MCP Adapter**: NO logic - pure transport layer (stdio ↔ MCP protocol)
+- **Bridge CLI**: Main logic - port discovery, TCP communication, tool implementation
+- **UE RPC Server**: UE-specific logic - UI inspection, control, state management
+
+**Why:** This allows Bridge to be developed independently. MCP is just a protocol wrapper.
 
 ### MCP Adapter (Python with MCP SDK)
 
@@ -16,16 +27,17 @@ Claude Code/MCP Client → (MCP protocol) → MCP Adapter → (stdio) → Bridge
   - Setup MCP SDK dependencies
   - Server entrypoint
 
-- [ ] Implement bridge CLI wrapper
-  - Spawn bridge CLI as subprocess
-  - Communicate via stdio
-  - Parse JSON responses
-  - Error handling and logging
+- [ ] Implement thin bridge CLI wrapper
+  - Spawn bridge CLI as subprocess (working directory = UE project)
+  - Forward stdio communication (no parsing, no logic)
+  - Simple error passthrough
+  - Minimal logging (connection state only)
 
-- [ ] Define MCP tools
-  - Tool: ue_ping - Ping UE server
-  - Tool: ue_health - Health check
-  - Map to bridge CLI commands
+- [ ] Define MCP tools (thin wrappers only)
+  - Tool: ue_ping - Maps to `ue-bridge ue.ping`
+  - Tool: ue_health - Maps to `ue-bridge ue.health`
+  - Direct stdio passthrough - no response parsing in MCP
+  - Bridge handles all logic, MCP just forwards
 
 - [ ] MCP server lifecycle
   - Initialize and start MCP server
@@ -50,14 +62,25 @@ Phase 2 is complete when:
 
 ### Reference Implementation
 
-See BlenderServer's MCP implementation at `/home/lpm/REPO/BlenderServer/mcp/` for:
-- MCP SDK usage patterns
-- Bridge CLI subprocess management
-- Tool definition structure
-- Error handling strategies
+See BlenderServer's MCP implementation at `/home/lpm/PROD/BlenderServer/mcp/` for:
+- MCP SDK usage patterns (thin wrapper approach)
+- Bridge CLI subprocess management (stdio forwarding)
+- Tool definition structure (minimal, no logic)
+- Error passthrough strategies
+
+**Important:** BlenderServer in PROD is the working reference - REPO is for development.
+
+### Development Strategy
+
+1. **Develop in ~/REPO/UEServer** (git branch: `mcp`)
+2. **Test thoroughly** with BlenderServer patterns
+3. **Clone to ~/PROD/UEServer** when stable (like BlenderServer)
+4. **Production updates** only when absolutely necessary
 
 ### Next Steps After Phase 2
 
-- Phase 3: UI Inspection (list widgets, get properties)
-- Phase 4: UI Control (trigger actions, update properties)
-- Phase 5: Advanced features (scripting, automation)
+Determined by needs and completed work (AI:DevOps methodology):
+- Possible: UI Inspection (list widgets, get properties)
+- Possible: UI Control (trigger actions, update properties)
+- Possible: Additional bridge tools
+- Emergent based on Phase 2 learnings
