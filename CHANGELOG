@@ -49,6 +49,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Created `CHANGELOG` (this file)
 
+- Created `TESTING.md`
+  - Step-by-step manual testing guide
+  - Automated test script for RPC server
+  - Success criteria and common issues
+  - Integration with UETRAIL test project
+
+- Created `.gitignore`
+  - Exclude `.ueserver/` runtime state directory
+  - Standard Python and IDE exclusions
+
+#### Testing Setup
+- Installed UEServer plugin in UETRAIL project (`/home/lpm/REPO/UETRAIL`)
+  - Copied plugin to `Plugins/UEServer/`
+  - Enabled in `UETRAIL.uproject`
+  - Ready for manual testing with UE5
+
 ### Technical Details
 
 **Port Discovery Mechanism:**
@@ -83,11 +99,107 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - ✅ Ping operation
 - ✅ Runtime state management (.ueserver/rpc.json)
 
-**Pending:**
-- ⏳ Manual testing with UE5 instance
-- ⏳ Python bridge CLI implementation
+### Added - 2025-12-26 (Session 2)
+
+#### Bridge CLI (Python with mypy)
+- Created Python bridge CLI structure in `bridge/`
+  - `pyproject.toml` - Package configuration with setuptools, mypy, ruff
+  - `ue_bridge/` package with clean module structure
+  - Entry point: `ue-bridge` CLI command and `python -m ue_bridge`
+
+- Implemented port discovery (`port_discovery.py`)
+  - Reads `.ueserver/rpc.json` from current working directory
+  - Validates JSON format and required fields (port, pid, started)
+  - PID validation to detect stale port files (via `os.kill(pid, 0)`)
+  - Clear error messages for all failure modes
+
+- Implemented TCP client (`tcp_client.py`)
+  - Async TCP connection using `asyncio.open_connection()`
+  - Line-based JSON protocol (newline-delimited)
+  - Request format: `{"id": "...", "op": "...", ...params}\n`
+  - Response parsing with timeout and error handling
+  - Connection cleanup (graceful close)
+
+- Implemented tool system (`tools.py`)
+  - Tool registry pattern (same as BlenderServer)
+  - `ue.ping` tool for health checks
+  - Extensible for future tools (UI inspection, control)
+
+- Implemented CLI interface (`cli.py`)
+  - CLI mode: `ue-bridge ue.ping`
+  - Stdio mode: `echo '{"tool":"ue.ping","args":{}}' | ue-bridge`
+  - Automatic port discovery on startup
+  - Key=value argument parsing
+  - Type auto-detection (bool, int, float, string)
+  - Help text with examples
+
+- Type safety
+  - Full mypy type annotations throughout
+  - Type protocols for extensibility (`ToolHandler`)
+  - TypedDict for structured data (`ToolContext`, `PortDiscoveryResult`, etc.)
+  - Passes `mypy --strict` with zero issues
+
+- Documentation
+  - `bridge/README.md` with usage examples
+  - Inline docstrings for all public functions
+  - Protocol reference documentation
+
+- Development setup
+  - `.gitignore` for Python artifacts
+  - `mypy.ini` with strict type checking
+  - `.python-version` (3.11)
+  - `requirements.txt` and `requirements-dev.txt`
+
+### Technical Details - Bridge CLI
+
+**Architecture:**
+```
+CLI Invocation → Port Discovery → TCP Client → UE RPC Server
+```
+
+**Port Discovery Flow:**
+1. Read `.ueserver/rpc.json` from CWD
+2. Validate JSON structure and types
+3. Check if PID is alive (detect crashed server)
+4. Return port or error message
+
+**TCP Protocol:**
+- Line-based JSON (newline-delimited)
+- Request: `{"id": "cli-abc123", "op": "ping"}\n`
+- Response: `{"id": "cli-abc123", "op": "ping", "ok": true, "version": "0.1.0"}\n`
+
+**Error Handling:**
+- Port file not found → "UE RPC server not running"
+- Invalid JSON → "Invalid JSON in rpc.json"
+- Stale PID → "Stale port file detected"
+- Connection refused → "Cannot reach UE RPC"
+- Timeout → "Timeout contacting UE RPC"
+
+### Status
+
+**Completed:**
+- ✅ UE5 plugin structure
+- ✅ TCP server with dynamic port allocation
+- ✅ JSON RPC protocol
+- ✅ Ping operation
+- ✅ Runtime state management (.ueserver/rpc.json)
+- ✅ Python bridge CLI structure
+- ✅ Port discovery implementation
+- ✅ TCP client implementation
+- ✅ CLI tool (ue.ping)
+- ✅ Type checking (mypy)
+
+**Pending (Next Session):**
+- ⏳ Manual testing with UE5 instance (UETRAIL project ready)
+- ⏳ End-to-end integration test (RPC server + bridge)
 - ⏳ MCP adapter implementation
 - ⏳ Additional RPC operations (UI inspection, control)
+
+**Session End**: 2025-12-26
+- RPC server implementation complete and ready for testing
+- Plugin installed in UETRAIL test project
+- Python bridge CLI complete with full type safety
+- Ready for end-to-end testing with UE5
 
 ---
 

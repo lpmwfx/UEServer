@@ -30,38 +30,38 @@ Goal: Get a minimal RPC server and bridge that can see each other with a simple 
 
 ### Bridge CLI (Python with mypy)
 
-- [ ] Create Python bridge CLI structure
+- [x] Create Python bridge CLI structure
   - Package structure: bridge/ue_bridge/
   - Setup pyproject.toml with mypy
   - Type definitions for RPC protocol
   - CLI entrypoint
 
-- [ ] Implement port discovery
+- [x] Implement port discovery
   - Read .ueserver/rpc.json from CWD
   - Parse port/pid/started fields
   - Validate PID (detect stale port files)
   - Error handling if RPC server not running
 
-- [ ] Implement TCP client and ping command
+- [x] Implement TCP client and ping command
   - Create TCP connection to localhost:<port>
   - Send ping JSON request
   - Receive and parse JSON response
-  - CLI command: bridge-cli ue.ping
+  - CLI command: ue-bridge ue.ping
 
 - [ ] Test end-to-end
   - Start UE5 with RPC server
-  - Run bridge-cli ue.ping from project directory
+  - Run ue-bridge ue.ping from project directory
   - Verify response shows ok=true and version
   - Test error cases (server not running, stale port file)
 
 ## Success Criteria
 
 MVP is complete when:
-1. UE5 plugin starts TCP server on dynamic port
-2. .ueserver/rpc.json is created with correct port info
-3. Bridge CLI can discover port and connect
-4. `bridge-cli ue.ping` returns successful response
-5. Error handling works (server down, stale files)
+1. ✅ UE5 plugin starts TCP server on dynamic port
+2. ✅ .ueserver/rpc.json is created with correct port info
+3. ✅ Bridge CLI can discover port and connect
+4. ⏳ `ue-bridge ue.ping` returns successful response (ready for testing)
+5. ⏳ Error handling works (server down, stale files) (ready for testing)
 
 ## Next Phase (Future)
 

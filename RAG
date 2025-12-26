@@ -1,0 +1,97 @@
+# UEServer RAG Index
+
+## Session 2 - Bridge CLI Implementation (2025-12-26)
+
+### Key Files Created
+
+#### Bridge CLI Structure
+- [bridge/pyproject.toml](bridge/pyproject.toml) - Package configuration with setuptools, mypy
+- [bridge/ue_bridge/__init__.py](bridge/ue_bridge/__init__.py) - Package initialization
+- [bridge/ue_bridge/__main__.py](bridge/ue_bridge/__main__.py) - Entry point for python -m
+- [bridge/ue_bridge/types.py](bridge/ue_bridge/types.py) - Type definitions (ToolContext, UEResponse, etc.)
+- [bridge/ue_bridge/port_discovery.py](bridge/ue_bridge/port_discovery.py) - Port discovery from .ueserver/rpc.json
+- [bridge/ue_bridge/tcp_client.py](bridge/ue_bridge/tcp_client.py) - TCP client for UE RPC
+- [bridge/ue_bridge/tools.py](bridge/ue_bridge/tools.py) - Tool registry and handlers
+- [bridge/ue_bridge/cli.py](bridge/ue_bridge/cli.py) - CLI interface (stdio and command-line)
+
+#### Documentation
+- [bridge/README.md](bridge/README.md) - Bridge CLI usage and API reference
+- [QUICKSTART.md](QUICKSTART.md) - Step-by-step testing guide
+
+#### Configuration
+- [bridge/.gitignore](bridge/.gitignore) - Python artifacts exclusions
+- [bridge/mypy.ini](bridge/mypy.ini) - Type checking configuration
+- [bridge/.python-version](bridge/.python-version) - Python version (3.11)
+- [bridge/requirements.txt](bridge/requirements.txt) - Runtime dependencies (none)
+- [bridge/requirements-dev.txt](bridge/requirements-dev.txt) - Dev dependencies (mypy, ruff, pytest)
+
+### Technical Concepts
+
+#### Port Discovery
+- **Location**: [port_discovery.py:8-110](bridge/ue_bridge/port_discovery.py#L8-L110)
+- **Method**: Read `.ueserver/rpc.json` from CWD
+- **Validation**: JSON structure, types, PID liveness check
+- **Stale Detection**: Uses `os.kill(pid, 0)` to check if process is alive
+
+#### TCP Client
+- **Location**: [tcp_client.py:42-124](bridge/ue_bridge/tcp_client.py#L42-L124)
+- **Transport**: TCP over localhost (127.0.0.1)
+- **Protocol**: Line-based JSON (newline-delimited)
+- **Timeout**: Configurable (default 2000ms)
+- **Connection**: `asyncio.open_connection()` with cleanup
+
+#### CLI Interface
+- **Location**: [cli.py:1-277](bridge/ue_bridge/cli.py#L1-L277)
+- **Modes**: CLI (`ue-bridge ue.ping`) and stdio (JSON over stdin/stdout)
+- **Argument Parsing**: Key=value with type auto-detection
+- **Error Handling**: Clear error messages for all failure modes
+
+### Searches and Findings
+
+#### BlenderServer Reference
+- Searched: `/home/lpm/REPO/BlenderServer/blender-bridge/`
+- Found: Package structure, CLI patterns, type definitions
+- Applied: Same architecture for ue-bridge
+
+#### Type Safety
+- Tool: `mypy --strict`
+- Result: Zero issues in 7 source files
+- Coverage: Full type annotations throughout
+
+### Links and References
+
+#### External
+- setuptools: https://setuptools.pypa.io/
+- mypy: https://mypy.readthedocs.io/
+- ruff: https://docs.astral.sh/ruff/
+- asyncio: https://docs.python.org/3/library/asyncio.html
+
+#### Internal
+- [RPC Server README](rpc/README.md) - RPC protocol specification
+- [TESTING.md](TESTING.md) - Manual testing guide for RPC server
+- [CLAUDE.md](CLAUDE.md) - Project architecture and design principles
+- [TODO](TODO) - Phase 1 MVP task breakdown
+
+### Commands Used
+
+```bash
+# Installation
+cd bridge/
+pip install -e .
+
+# Testing
+python3 -m ue_bridge --help
+python3 -m ue_bridge ue.ping
+
+# Type checking
+mypy ue_bridge/
+
+# Linting
+ruff check ue_bridge/
+```
+
+### Next Steps (from TODO)
+- [ ] Test RPC server manually with UE5
+- [ ] End-to-end integration test (RPC + bridge)
+- [ ] MCP adapter implementation
+- [ ] Additional RPC operations

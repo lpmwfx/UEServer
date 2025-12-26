@@ -154,7 +154,15 @@ bool FUEServerRPC::CreateListenerSocket()
 
 	// Bind to localhost:0 (OS assigns available port)
 	TSharedRef<FInternetAddr> LocalAddr = SocketSubsystem->CreateInternetAddr();
-	LocalAddr->SetIp(TEXT("127.0.0.1"));
+	bool bIsValid = false;
+	LocalAddr->SetIp(TEXT("127.0.0.1"), bIsValid);
+	if (!bIsValid)
+	{
+		UE_LOG(LogTemp, Error, TEXT("UEServerRPC: Invalid IP address"));
+		SocketSubsystem->DestroySocket(ListenerSocket);
+		ListenerSocket = nullptr;
+		return false;
+	}
 	LocalAddr->SetPort(0); // Dynamic port allocation
 
 	if (!ListenerSocket->Bind(*LocalAddr))
@@ -324,9 +332,10 @@ FString FUEServerRPC::HandlePing(const TSharedPtr<FJsonObject>& Request)
 		Response->SetStringField(TEXT("id"), Request->GetStringField(TEXT("id")));
 	}
 
-	// Serialize
+	// Serialize (compact, single-line JSON)
 	FString OutputString;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
 	FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
 	return OutputString;
 }
