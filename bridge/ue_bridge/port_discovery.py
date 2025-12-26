@@ -76,6 +76,24 @@ def discover_port(project_dir: str | None = None) -> PortDiscoveryResult:
             "error": f"Invalid 'instances' type in {switchboard_path}: expected list",
         }
 
+    # Auto-cleanup: Remove dead instances (PIDs not running)
+    alive_instances = []
+    for instance in instances:
+        pid = instance.get("pid")
+        if pid and isinstance(pid, int) and _is_process_running(pid):
+            alive_instances.append(instance)
+
+    # If we removed any dead instances, write back cleaned switchboard
+    if len(alive_instances) < len(instances):
+        try:
+            data["instances"] = alive_instances
+            with open(switchboard_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            pass  # Cleanup is best-effort, continue even if write fails
+
+    instances = alive_instances
+
     if len(instances) == 0:
         return {
             "ok": False,

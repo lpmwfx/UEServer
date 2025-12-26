@@ -1,6 +1,6 @@
 """Tool handlers for UE Bridge."""
 
-from typing import Any
+from typing import Any, cast
 
 from .tcp_client import call_ue
 from .types import ToolContext, ToolHandler, UEResponse
@@ -36,7 +36,7 @@ async def ue_health(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
             {"ok": true, "status": "healthy"} or {"ok": false, "error": "..."}
     """
     # Override timeout to 500ms for quick health check
-    health_ctx = {**ctx, "timeout_ms": 500}
+    health_ctx = cast(ToolContext, {**ctx, "timeout_ms": 500})
 
     try:
         response = await call_ue("ping", {}, health_ctx)

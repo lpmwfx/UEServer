@@ -55,13 +55,23 @@ Claude Code/MCP Client → (MCP protocol) → MCP Adapter → (stdio) → Bridge
 
 Phase 2 is complete when:
 1. [x] MCP server can be started and discovered by MCP clients
-2. [x] ue.ping tool works via MCP (implementation verified)
-3. [x] ue.health tool works via MCP (implementation verified)
+2. [x] ue.ping tool works via MCP (live tested ✅)
+3. [x] ue.health tool works via MCP (live tested ✅)
 4. [x] Error handling is robust
-5. [ ] Integration with Claude Code is verified (requires UE running)
+5. [x] Integration with Claude Code verified (live tested ✅)
 
-**Note:** Items 1-4 complete. Item 5 requires UE5 running with UEServer plugin.
-Use `.mcp.json` configuration to test with Claude Code when UE is available.
+**✅ ALL CRITERIA MET - PHASE 2 COMPLETE!**
+
+### Bonus Improvements (Session 5)
+
+- [x] **Auto-cleanup of dead instances**
+  - Port discovery automatically removes stale PIDs from switchboard.json
+  - Prevents "multiple instance" errors
+  - Makes discovery robust and reliable
+
+- [x] **Type safety improvements**
+  - Fixed mypy type error in tools.py
+  - Bridge passes `mypy --strict` with zero errors
 
 ### Reference Implementation
 
