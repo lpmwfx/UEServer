@@ -1,99 +1,224 @@
 # UEServer TODO
 
-## Phase 2: MCP Integration
+## Phase 3: UI Automation
 
-**Goal:** Create a thin MCP adapter that wraps the bridge CLI, enabling Claude Code and other MCP clients to interact with UE5.
+**Goal:** Enable AI-driven UI automation in Unreal Editor through structured UI inspection and control.
 
-**Important:** We're now on git branch `mcp` - Phase 1 MVP is complete and stable on main.
+**Important:** We're now on git branch `MPC-automation-phase-3`. Phases 1 & 2 are complete and stable on main.
 
-### Architecture & Logic Distribution
+### Architecture
 
 ```
-Claude Code/MCP Client → (MCP protocol) → MCP Adapter → (stdio) → Bridge CLI → (TCP) → UE RPC Server
-                                            [THIN]                   [LOGIC]              [LOGIC]
+Claude Code → MCP → Bridge → RPC Server → UE Slate UI System
+              [MCP]  [LOGIC]   [LOGIC]      [UI QUERIES/ACTIONS]
 ```
 
-**Logic Distribution:**
-- **MCP Adapter**: NO logic - pure transport layer (stdio ↔ MCP protocol)
-- **Bridge CLI**: Main logic - port discovery, TCP communication, tool implementation
-- **UE RPC Server**: UE-specific logic - UI inspection, control, state management
+**Focus Areas:**
+1. **UI Inspection** - Discover and query UI elements
+2. **UI Control** - Trigger actions and modify state
+3. **AI-Friendly Patterns** - Make UI discoverable and actionable for AI agents
 
-**Why:** This allows Bridge to be developed independently. MCP is just a protocol wrapper.
+### Phase 3A: UI Discovery & Inspection
 
-### MCP Adapter (Python with MCP SDK)
+**Goal:** AI can "see" the UE Editor UI structure and query properties.
 
-- [x] Create MCP server structure
-  - Package structure: mcp/ue_mcp/
-  - Setup MCP SDK dependencies
-  - Server entrypoint
+- [ ] **RPC: UI Tree Inspection**
+  - Implement `ue.ui.get_tree` operation
+  - Traverse Slate widget hierarchy from root
+  - Return structured JSON tree with widget info:
+    - Widget type (e.g., SButton, STextBlock, SWindow)
+    - Widget identifier (if available)
+    - Visibility state
+    - Position and size
+    - Text content (if applicable)
+    - Parent-child relationships
 
-- [x] Implement thin bridge CLI wrapper
-  - Direct import from bridge (not subprocess - simpler and more efficient)
-  - Zero business logic in MCP layer
-  - Direct passthrough to bridge handlers
-  - Clean error handling
+- [ ] **RPC: Widget Query by Path**
+  - Implement `ue.ui.get_widget` operation
+  - Accept widget path (e.g., "MainFrame/MenuBar/File")
+  - Return detailed widget properties
+  - Support for wildcard/fuzzy matching
 
-- [x] Define MCP tools (thin wrappers only)
-  - Tool: ue.ping - Direct bridge import
-  - Tool: ue.health - Direct bridge import
-  - Auto-discovery from TOOL_HANDLERS registry
-  - Bridge handles all logic, MCP just forwards
+- [ ] **RPC: Widget Search**
+  - Implement `ue.ui.find_widgets` operation
+  - Search by:
+    - Widget type
+    - Text content
+    - Visibility state
+    - Custom properties
+  - Return array of matching widgets with paths
 
-- [x] MCP server lifecycle
-  - Initialize and start MCP server
-  - Handle client connections via stdio
-  - Graceful shutdown
-  - Resource cleanup
+- [ ] **Bridge: UI Inspection Tools**
+  - `ue.ui.tree` - Get full UI hierarchy
+  - `ue.ui.get` - Get specific widget by path
+  - `ue.ui.find` - Search for widgets
+  - Type-safe response handling
 
-- [x] Testing
-  - Type checking with mypy (passes)
-  - Tool registration verified
-  - Package installation verified
-  - Ready for integration testing with UE running
+- [ ] **Testing: UI Inspection**
+  - Test with UE Editor running
+  - Verify main menu structure visible
+  - Verify content browser discoverable
+  - Test widget search functionality
+
+### Phase 3B: UI Control & Actions
+
+**Goal:** AI can interact with UI elements (click, type, etc.).
+
+- [ ] **RPC: Widget Actions**
+  - Implement `ue.ui.click` operation
+    - Accept widget path
+    - Simulate click event
+    - Return success/failure
+
+  - Implement `ue.ui.type` operation
+    - Accept widget path and text
+    - Set text field value
+    - Return success/failure
+
+  - Implement `ue.ui.invoke` operation
+    - Generic action invocation
+    - Support for menu items, buttons, etc.
+
+- [ ] **Bridge: UI Control Tools**
+  - `ue.ui.click` - Click a widget
+  - `ue.ui.type` - Type into text field
+  - `ue.ui.invoke` - Invoke action
+  - Error handling for invalid targets
+
+- [ ] **Safety & Validation**
+  - Validate widget exists before action
+  - Check widget is visible and enabled
+  - Timeout handling for actions
+  - Graceful failure modes
+
+- [ ] **Testing: UI Control**
+  - Test clicking menu items
+  - Test typing in search boxes
+  - Test invoking actions
+  - Verify error handling
+
+### Phase 3C: Common UI Workflows
+
+**Goal:** High-level operations for common editor tasks.
+
+- [ ] **Content Browser Operations**
+  - `ue.content.navigate` - Navigate to folder
+  - `ue.content.search` - Search for assets
+  - `ue.content.create` - Create new asset
+  - `ue.content.import` - Import file
+
+- [ ] **Menu Operations**
+  - `ue.menu.click` - Click menu item by path
+  - `ue.menu.list` - List available menu items
+  - `ue.menu.find` - Find menu item by name
+
+- [ ] **Viewport Operations**
+  - `ue.viewport.focus` - Focus on object
+  - `ue.viewport.set_camera` - Set camera position
+  - `ue.viewport.capture` - Capture screenshot
+
+- [ ] **Testing: Workflows**
+  - Test content browser navigation
+  - Test menu interactions
+  - Test viewport control
+  - End-to-end workflow tests
 
 ### Success Criteria
 
-Phase 2 is complete when:
-1. [x] MCP server can be started and discovered by MCP clients
-2. [x] ue.ping tool works via MCP (live tested ✅)
-3. [x] ue.health tool works via MCP (live tested ✅)
-4. [x] Error handling is robust
-5. [x] Integration with Claude Code verified (live tested ✅)
+Phase 3 is complete when:
+1. [ ] AI can query full UI hierarchy of UE Editor
+2. [ ] AI can find specific widgets by search criteria
+3. [ ] AI can click buttons and menu items
+4. [ ] AI can type into text fields
+5. [ ] Common workflows (content browser, menus) work reliably
+6. [ ] Error handling is robust for invalid operations
+7. [ ] All operations work via MCP with UE running
 
-**✅ ALL CRITERIA MET - PHASE 2 COMPLETE!**
+### Design Principles
 
-### Bonus Improvements (Session 5)
+**AI-First Design:**
+- Structured, machine-readable responses (JSON)
+- Descriptive widget identifiers
+- Clear parent-child relationships
+- Search-friendly metadata
 
-- [x] **Auto-cleanup of dead instances**
-  - Port discovery automatically removes stale PIDs from switchboard.json
-  - Prevents "multiple instance" errors
-  - Makes discovery robust and reliable
+**Safety:**
+- Read-only operations first (inspection)
+- Validation before destructive actions
+- Timeout protection
+- Clear error messages
 
-- [x] **Type safety improvements**
-  - Fixed mypy type error in tools.py
-  - Bridge passes `mypy --strict` with zero errors
+**Performance:**
+- Incremental tree traversal
+- Caching where appropriate
+- Efficient widget lookups
+- Minimal UI blocking
+
+### Technical Notes
+
+**Slate UI Access:**
+- Use `FSlateApplication::Get()` to access UI
+- Traverse widget hierarchy via `GetAllWidgets()`
+- Widget introspection via RTTI and Slate APIs
+- Event simulation via Slate's event system
+
+**Widget Identification:**
+- Use widget metadata when available
+- Generate stable paths based on hierarchy
+- Support for both path-based and search-based lookup
+
+**JSON Schema:**
+```json
+// UI Tree Response
+{
+  "ok": true,
+  "root": {
+    "type": "SWindow",
+    "id": "MainFrame",
+    "children": [
+      {
+        "type": "SMenuBar",
+        "id": "MenuBar",
+        "children": [...]
+      }
+    ]
+  }
+}
+
+// Widget Query Response
+{
+  "ok": true,
+  "widget": {
+    "type": "SButton",
+    "path": "MainFrame/Toolbar/PlayButton",
+    "visible": true,
+    "enabled": true,
+    "text": "Play",
+    "bounds": {"x": 100, "y": 50, "width": 80, "height": 30}
+  }
+}
+```
 
 ### Reference Implementation
 
-See BlenderServer's MCP implementation at `/home/lpm/PROD/BlenderServer/mcp/` for:
-- MCP SDK usage patterns (thin wrapper approach)
-- Bridge CLI subprocess management (stdio forwarding)
-- Tool definition structure (minimal, no logic)
-- Error passthrough strategies
-
-**Important:** BlenderServer in PROD is the working reference - REPO is for development.
+See BlenderServer's UI automation (if available) for:
+- UI tree traversal patterns
+- Widget action patterns
+- Error handling strategies
+- MCP integration for UI ops
 
 ### Development Strategy
 
-1. **Develop in ~/REPO/UEServer** (git branch: `mcp`)
-2. **Test thoroughly** with BlenderServer patterns
-3. **Clone to ~/PROD/UEServer** when stable (like BlenderServer)
-4. **Production updates** only when absolutely necessary
+1. **Start with Inspection (Phase 3A)** - Read-only, safe
+2. **Add Control (Phase 3B)** - Incremental, validated
+3. **Build Workflows (Phase 3C)** - High-level, AI-friendly
+4. **Iterate based on usage** - AI:DevOps methodology
 
-### Next Steps After Phase 2
+### Next Steps After Phase 3
 
-Determined by needs and completed work (AI:DevOps methodology):
-- Possible: UI Inspection (list widgets, get properties)
-- Possible: UI Control (trigger actions, update properties)
-- Possible: Additional bridge tools
-- Emergent based on Phase 2 learnings
+Determined by AI agent needs:
+- Advanced UI automation (drag-drop, complex workflows)
+- Blueprint automation (visual scripting)
+- Asset management operations
+- Level editing automation
+- Build and packaging automation
