@@ -226,3 +226,216 @@ if len(alive_instances) < len(instances):
 5. ✅ Integration verified with UE running
 
 **System is production-ready for AI UI/UX automation!**
+
+## Session 6 - ue.start Tool & Pre-Phase 3 Testing (2025-12-27)
+
+### User Need: Automated UE5 Startup
+
+**Problem:**
+- Manual UE5 startup required before using bridge
+- No way to start UE5 from CLI/MCP
+- User asked: "kan ue-bridge ikke starte ue?" (can't ue-bridge start ue?)
+
+### Solution: ue.start Tool
+
+**Implementation:** `bridge/ue_bridge/tools.py`
+
+**Features:**
+- Auto-detects .uproject file from CWD
+- Auto-detects UnrealEditor executable (default: `/home/lpm/PROD/UnrealEngine-5.7.1/Engine/Binaries/Linux/UnrealEditor`)
+- Launches UE5 detached (background process with `start_new_session=True`)
+- Polls switchboard.json for registration (configurable timeout, default 30s)
+- Returns port/pid when ready
+
+**CLI Enhancement:**
+- Special handling for `ue.start` command (no port discovery needed)
+- Modified `cli.py` to bypass `create_context()` for startup command
+- Dummy context provided (won't be used by ue.start handler)
+
+**Code Pattern:**
+```python
+async def ue_start(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
+    # Auto-detect paths
+    project_path = args.get("project_path") or auto_detect_uproject()
+    editor_path = args.get("editor_path") or "/home/lpm/PROD/UnrealEngine-5.7.1/..."
+
+    # Launch detached
+    subprocess.Popen([editor_path, project_path],
+                     stdout=DEVNULL, stderr=DEVNULL,
+                     start_new_session=True)
+
+    # Wait for switchboard registration
+    while time.time() - start < timeout:
+        if switchboard_has_instances():
+            return instance_info
+
+    return timeout_error
+```
+
+### Testing Results
+
+**Installation:**
+- `pip install -e bridge/` ✅
+- `pip install -e mcp/` ✅
+
+**Bridge Tests:**
+1. ✅ `ue.start` - Launched UE5 successfully
+   - Port: 36499
+   - PID: 43971
+   - Wait time: ~13 seconds
+
+2. ✅ `ue.ping` - Connection verified
+   - Response: `{"ok": true, "version": "0.1.0"}`
+
+3. ✅ `ue.health` - Health check passed
+   - Response: `{"ok": true, "status": "healthy"}`
+
+**MCP Test:**
+- ✅ Server starts with 3 tools: `ue.health`, `ue.ping`, `ue.start`
+- ✅ Auto-discovery working
+- ✅ Ready for `~/.claude` integration
+
+**Switchboard Verification:**
+```json
+{"instances":[{
+  "pid":43971,
+  "port":36499,
+  "project":"../../../../../REPO/UETRAIL/UETRAIL.uproject",
+  "project_name":"UETRAIL",
+  "started":"2025-12-27T11:43:47.624Z"
+}]}
+```
+
+### Key Findings
+
+**UE5 Startup:**
+- Editor path: `/home/lpm/PROD/UnrealEngine-5.7.1/Engine/Binaries/Linux/UnrealEditor`
+- Test project: `/home/lpm/REPO/UETRAIL/UETRAIL.uproject`
+- Startup time: ~13-15 seconds on this system
+- Plugin auto-loads and registers in switchboard
+
+**Process Management:**
+- `start_new_session=True` properly detaches UE5 from bridge
+- UE5 continues running after bridge exits
+- Switchboard cleanup on UE5 exit still works
+
+### Status: Pre-Phase 3 Complete ✅
+
+**All Infrastructure Ready:**
+1. ✅ RPC Server running (tested)
+2. ✅ Bridge with 3 tools (ue.start, ue.ping, ue.health)
+3. ✅ MCP auto-discovering tools
+4. ✅ Automated startup capability
+5. ✅ Ready for Phase 3 (UI Automation)
+
+**Next:** Begin Phase 3A - UI Inspection (Slate widget hierarchy traversal)
+
+## Session 7 - MCP Global Configuration & Documentation (2025-12-27)
+
+### Problem: Incorrect MCP Configuration Approach
+
+**Initial Mistake:**
+- Tried configuring MCP servers in project-specific `.mcp.json` files
+- Created `.mcp.json` in ~/REPO/UEServer and ~/PROD/UEServer
+- This caused blender and godot MCPs to fail when working in UEServer project
+
+### Solution: Global MCP Configuration
+
+**Correct Approach:**
+- MCP servers are configured **globally in ~/.claude.json**
+- Use `claude mcp add --transport stdio <name> --scope user -- <command>`
+- NOT in project-specific .mcp.json files
+
+**Implementation:**
+```bash
+# Add ue-server MCP globally
+claude mcp add --transport stdio ue-server --scope user -- python -m ue_mcp
+
+# Verify
+claude mcp list
+# Output:
+# godot: ✓ Connected
+# blender: ✓ Connected
+# ue-server: ✓ Connected
+```
+
+### MCP Configuration Scopes
+
+**Three scopes available:**
+
+1. **User Scope (Global)** - `~/.claude.json`
+   - Available across ALL projects
+   - Private to your user account
+   - Use `--scope user` flag
+   - **This is what we use for ue-server**
+
+2. **Local Scope (Default)** - `~/.claude.json` (project-specific)
+   - Only accessible in current project directory
+   - Private to you
+
+3. **Project Scope** - `.mcp.json` in project root
+   - Checked into version control
+   - Shared with team
+   - Use `--scope project` flag
+
+**Scope Hierarchy:**
+1. Local (highest priority)
+2. Project
+3. User (lowest priority)
+
+### Project Structure Cleanup
+
+**Development vs Production:**
+- **~/REPO/UEServer** - Development area (git repo)
+- **~/PROD/UEServer** - Production area (git clone from REPO)
+- Sync via: `git pull origin <branch>` in PROD
+
+**Removed files:**
+- `/home/lpm/REPO/UEServer/.mcp.json` (no longer needed)
+- `/home/lpm/PROD/UEServer/.mcp.json` (no longer needed)
+- `/home/lpm/REPO/UETRAIL/.mcp.json` (no longer needed)
+
+### Documentation Downloaded
+
+**Location:** `/home/lpm/DEVLIB/MANUALS/Claude-Code-MCP-Guide.md`
+
+**Key Sections:**
+- Installing MCP Servers (HTTP, SSE, Stdio)
+- Managing MCP Servers
+- MCP Installation Scopes
+- Environment Variable Expansion
+- OAuth 2.0 Authentication
+- Enterprise MCP Configuration
+
+### Key Learnings
+
+**MCP Server Configuration:**
+```bash
+# Add stdio MCP server globally
+claude mcp add --transport stdio <name> --scope user -- <command> [args...]
+
+# The -- separator is critical:
+# - Before --: Claude's flags (--env, --scope)
+# - After --: Command to run
+
+# Example with environment variable
+claude mcp add --transport stdio server --scope user \
+  --env API_KEY=value \
+  -- python -m server_module
+```
+
+**Best Practice:**
+- Use `--scope user` for personal tools (like ue-server)
+- Use `--scope project` for team-shared tools
+- Store sensitive data in environment variables with `--env`
+
+### Status: MCP Configuration Complete ✅
+
+**All systems operational:**
+1. ✅ ue-server MCP configured globally in ~/.claude
+2. ✅ All 3 MCP servers connected (godot, blender, ue-server)
+3. ✅ MCP documentation saved to ~/DEVLIB/MANUALS/
+4. ✅ Project cleanup complete (removed unnecessary .mcp.json files)
+5. ✅ Ready for Phase 3A implementation
+
+**Next:** Implement ue.ui.get_tree in C++ RPC server (Slate UI traversal)

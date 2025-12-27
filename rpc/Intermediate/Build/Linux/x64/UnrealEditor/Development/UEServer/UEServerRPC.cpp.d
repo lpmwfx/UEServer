@@ -3033,4 +3033,7 @@
   Runtime/Json/Public/Dom/JsonObject.h \
   Runtime/Json/Public/Serialization/JsonReader.h \
   Runtime/Json/Public/Serialization/JsonWriter.h \
-  Runtime/Json/Public/Serialization/JsonSerializer.h
+  Runtime/Json/Public/Serialization/JsonSerializer.h \
+  Runtime/Slate/Public/Framework/Application/SlateApplication.h \
+  Runtime/SlateCore/Public/Widgets/SWidget.h \
+  Runtime/SlateCore/Public/Widgets/SWindow.h

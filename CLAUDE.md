@@ -73,9 +73,70 @@ Key difference: BlenderServer uses WebSocket (fixed port via env var); UEServer 
 
 ## Development Status
 
-This is an early-stage project. The directory structure is in place but implementation is pending. When developing:
+**Current Phase:** Phase 3 - UI Automation (in progress)
+
+**Completed:**
+- ✅ Phase 1: RPC Bridge MVP
+- ✅ Phase 2: MCP Integration
+- ✅ MCP globally configured in `~/.claude` (user scope)
+
+**Active Development:**
+- 🔄 Phase 3A: UI Discovery & Inspection (next: ue.ui.get_tree)
+
+When developing:
 
 - Maintain separation of concerns between the three components
 - Keep the Bridge CLI as the sole integration point
 - Ensure the MCP adapter remains thin and delegates to the bridge
 - Design RPC APIs to be stable and explicit
+
+## MCP Configuration (IMPORTANT!)
+
+**ue-server MCP is configured GLOBALLY in ~/.claude.json:**
+
+```bash
+# Add globally (already done)
+claude mcp add --transport stdio ue-server --scope user -- python -m ue_mcp
+
+# Verify status
+claude mcp list
+
+# Expected output:
+# godot: ✓ Connected
+# blender: ✓ Connected
+# ue-server: ✓ Connected
+```
+
+**Key Points:**
+- MCP servers are configured in `~/.claude.json` (NOT in project .mcp.json files)
+- Use `--scope user` for global availability across all projects
+- The `--` separator divides Claude flags from the command
+- See `/home/lpm/DEVLIB/MANUALS/Claude-Code-MCP-Guide.md` for full documentation
+
+## Project Structure
+
+**Development vs Production:**
+- `~/REPO/UEServer` - Development area (main git repo)
+- `~/PROD/UEServer` - Production area (git clone, for running/testing)
+
+**Sync workflow:**
+```bash
+# In development (~/REPO/UEServer)
+git add .
+git commit -m "changes"
+git push origin <branch>
+
+# In production (~/PROD/UEServer)
+git pull origin <branch>
+```
+
+## Available Tools (via ue-server MCP)
+
+1. `ue.start` - Start UE5 automatically with UEServer plugin
+2. `ue.ping` - Test RPC server connectivity
+3. `ue.health` - Quick health check (500ms timeout)
+
+**Coming in Phase 3:**
+- `ue.ui.get_tree` - Get Slate widget hierarchy
+- `ue.ui.get_widget` - Query widget by path
+- `ue.ui.find_widgets` - Search for widgets

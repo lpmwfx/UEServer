@@ -262,9 +262,20 @@ async def async_main() -> None:
             else:
                 filtered_args.append(arg)
 
-        # Discover port first
-        ctx = create_context(timeout_ms=timeout_ms)
-        await cli_once(filtered_args, ctx)
+        # Special case: ue.start doesn't need port discovery
+        # It will start UE5 and return the port info
+        if filtered_args and filtered_args[0] == "ue.start":
+            # Create dummy context (won't be used by ue.start)
+            ctx: ToolContext = {
+                "host": "127.0.0.1",
+                "port": 0,
+                "timeout_ms": timeout_ms,
+            }
+            await cli_once(filtered_args, ctx)
+        else:
+            # Discover port first for all other commands
+            ctx = create_context(timeout_ms=timeout_ms)
+            await cli_once(filtered_args, ctx)
     else:
         # If running in a TTY with no args, show help.
         if sys.stdin.isatty():

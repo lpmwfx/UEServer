@@ -362,13 +362,63 @@ switchboard.json only contains live instances, making discovery robust.
 
 **Phase 2 FULLY Complete!** 🎉
 
-### Next: Phase 3 - UI Inspection/Control (TBD)
+### Added - 2025-12-27 (Session 6 - ue.start Tool & Pre-Phase 3 Testing)
 
-**Possible Goals:**
-- UI widget hierarchy inspection
-- Property reading/writing
-- Action triggering
-- Emergent based on Phase 2 usage
+#### Bridge CLI Enhancement
+- **NEW TOOL: `ue.start`** - Automated UE5 startup
+  - Auto-detects .uproject file from CWD
+  - Auto-detects UnrealEditor path (default: `/home/lpm/PROD/UnrealEngine-5.7.1/Engine/Binaries/Linux/UnrealEditor`)
+  - Launches UE5 in background (detached process)
+  - Waits for switchboard registration (configurable timeout, default 30s)
+  - Returns port/pid info when server is ready
+  - Usage: `python3 -m ue_bridge ue.start [wait_timeout=45]`
+
+- CLI enhancement for startup commands
+  - Special handling for `ue.start` - bypasses port discovery
+  - Other commands still require running UE instance
+
+#### Testing & Verification
+- **Full Infrastructure Test** ✅
+  - RPC Server: Started UE5, verified switchboard registration
+  - Bridge CLI: All 3 tools tested and working
+    - `ue.start` → UE5 launched successfully (port 36499, PID 43971)
+    - `ue.ping` → Connection verified
+    - `ue.health` → Health check passed
+  - MCP Server: Auto-discovered all 3 tools
+    - Tools: `ue.health`, `ue.ping`, `ue.start`
+    - Ready for Claude Code integration via `~/.claude`
+
+#### Installation
+- Bridge and MCP packages installed in editable mode
+  - `pip install -e bridge/`
+  - `pip install -e mcp/`
+  - All dependencies resolved
+
+### Status - Pre-Phase 3 Infrastructure ✅
+
+**All systems operational and tested:**
+1. ✅ RPC Server running and responsive
+2. ✅ Bridge CLI with 3 working tools
+3. ✅ MCP server auto-discovering tools
+4. ✅ Automated UE5 startup capability
+5. ✅ Ready to begin Phase 3 (UI Automation)
+
+### Next: Phase 3 - UI Inspection/Control
+
+**Phase 3A Goals:**
+- UI widget hierarchy inspection (`ue.ui.get_tree`)
+- Widget query by path (`ue.ui.get_widget`)
+- Widget search by criteria (`ue.ui.find_widgets`)
+- Slate UI traversal implementation in C++
+
+**Phase 3B Goals:**
+- UI control operations (`ue.ui.click`, `ue.ui.type`, `ue.ui.invoke`)
+- Action simulation in Slate
+- Safety and validation
+
+**Phase 3C Goals:**
+- High-level workflows (content browser, menus, viewport)
+- Common editor operations
 
 ---
 
