@@ -438,4 +438,207 @@ claude mcp add --transport stdio server --scope user \
 4. ✅ Project cleanup complete (removed unnecessary .mcp.json files)
 5. ✅ Ready for Phase 3A implementation
 
-**Next:** Implement ue.ui.get_tree in C++ RPC server (Slate UI traversal)
+## Session 8 - Phase 3A: UI Discovery & Inspection (2025-12-27)
+
+### Implementation: ue.ui.get_tree
+
+**Goal:** Enable AI to "see" UE Editor UI structure by querying Slate widget hierarchy.
+
+**C++ RPC Server Changes:**
+
+Files modified:
+- `rpc/Source/UEServer/Private/UEServerRPC.cpp`
+- `rpc/Source/UEServer/Public/UEServerRPC.h`
+
+Added includes:
+- `Framework/Application/SlateApplication.h`
+- `Widgets/SWidget.h`
+- `Widgets/SWindow.h`
+- `Async/Async.h`
+
+Implemented operations:
+1. **HandleUIGetTree()**
+   - Entry point for `ui.get_tree` RPC operation
+   - Dispatches to Game Thread via `AsyncTask(ENamedThreads::GameThread)`
+   - Uses `TPromise<FString>`/`TFuture<FString>` for cross-thread synchronization
+   - RPC thread blocks waiting for Game Thread to complete UI query
+   - Returns serialized JSON response
+
+2. **SerializeWidget()**
+   - Recursive helper for widget tree serialization
+   - Captures: type (via `GetTypeAsString()`), visibility, enabled state, geometry, text, children
+   - Respects `max_depth` parameter to limit recursion
+   - Returns `TSharedPtr<FJsonObject>` with widget metadata
+
+**Threading Challenge & Solution:**
+
+Problem:
+```
+Assertion failed: IsInGameThread() || IsInSlateThread()
+[File:Runtime/Slate/Public/Framework/Application/SlateApplication.h] [Line: 322]
+```
+
+Root cause: `FSlateApplication::Get()` can ONLY be called from Game Thread or Slate Thread.
+RPC server runs in dedicated `FRunnable` thread.
+
+Solution:
+```cpp
+// RPC thread creates Promise
+TPromise<FString> Promise;
+TFuture<FString> Future = Promise.GetFuture();
+
+// Dispatch to Game Thread
+AsyncTask(ENamedThreads::GameThread, [Promise]() mutable {
+    // All Slate API calls happen here
+    FSlateApplication::Get().GetAllVisibleWindowsOrdered(Windows);
+    // ...serialize...
+    Promise.SetValue(responseJson);
+});
+
+// RPC thread blocks waiting for result
+return Future.Get();
+```
+
+This pattern ensures thread-safe Slate access while maintaining synchronous RPC behavior.
+
+**Python Bridge Changes:**
+
+File: `bridge/ue_bridge/tools.py`
+
+Added tool:
+```python
+async def ue_ui_get_tree(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
+    """Get the Slate UI widget tree from Unreal Editor."""
+    max_depth = args.get("max_depth", 10)
+    return await call_ue("ui.get_tree", {"max_depth": max_depth}, ctx)
+```
+
+Tool registry:
+```python
+TOOL_HANDLERS = {
+    ...
+    "ue.ui.get_tree": ue_ui_get_tree,
+}
+```
+
+**MCP Integration:**
+- Zero changes required
+- MCP server auto-discovers `ue.ui.get_tree` via `TOOL_HANDLERS` registry
+- Works immediately after bridge update
+
+### Design Philosophy Established
+
+**Key Insight:** ue-server is NOT a new DSL - it's a BRIDGE to existing UE/Slate API.
+
+Principles:
+1. **Zero Abstraction in Data**
+   - Return RAW Slate terminology: `SWindow`, `SOverlay`, `SNotificationList`
+   - Native properties: `geometry`, `visible`, `enabled`, `children`
+   - AI reads UE docs → understands our responses directly
+
+2. **AI-UX First**
+   - Design for AI agents, not human brevity
+   - Familiarity > conciseness
+   - Consistency with UE ecosystem
+
+3. **Abstraction Only for Convenience**
+   - Like macros: shortcuts to common patterns
+   - But RAW access always available
+   - Example: `ue.ui.find_button("Play")` wraps `ue.ui.get_tree` + filter
+
+4. **Bridge Naming Pattern**
+   - Bridge tool: `ue.ui.get_tree`
+   - RPC operation: `ui.get_tree`
+   - Pattern: `ue.<domain>.<action>` → `<domain>.<action>`
+
+### Testing Results
+
+**Environment:**
+- UE 5.7.1
+- UETRAIL test project
+- Plugin symlinked from `/home/lpm/REPO/UEServer/rpc`
+
+**Test Commands:**
+```bash
+# Via bridge CLI (REPO)
+cd /home/lpm/REPO/UETRAIL
+python3 -m ue_bridge ue.ui.get_tree max_depth=2
+
+# Via bridge stdio (PROD)
+cd /home/lpm/PROD/UEServer
+echo '{"tool":"ue.ui.get_tree","args":{"max_depth":1}}' | python3 -m ue_bridge
+```
+
+**Results:**
+- ✅ Returns 3 top-level `SWindow` instances
+- ✅ Main editor window: "UETRAIL - Unreal Editor" (1286x726 pixels)
+- ✅ Notification windows detected
+- ✅ Widget tree depth configurable
+- ✅ No threading crashes
+- ✅ Thread-safe Slate API access verified
+
+**Example Response:**
+```json
+{
+  "tool": "ue.ui.get_tree",
+  "ok": true,
+  "response": {
+    "op": "ui.get_tree",
+    "ok": true,
+    "windows": [
+      {
+        "type": "SWindow",
+        "visible": true,
+        "enabled": true,
+        "geometry": {"x": 384, "y": 296, "width": 1286, "height": 726},
+        "text": "UETRAIL - Unreal Editor",
+        "children": [
+          {
+            "type": "SOverlay",
+            "visible": true,
+            "enabled": true,
+            "geometry": {...},
+            "children": [],
+            "child_count": 0
+          }
+        ],
+        "child_count": 1
+      }
+    ],
+    "window_count": 3
+  }
+}
+```
+
+### Key Learnings
+
+**Slate API Threading:**
+- Slate is NOT thread-safe
+- Must use `AsyncTask(ENamedThreads::GameThread)` for UI queries
+- `TPromise`/`TFuture` pattern enables sync wait from other threads
+
+**Widget Hierarchy:**
+- Windows via `FSlateApplication::Get().GetAllVisibleWindowsOrdered()`
+- Children via `widget->GetChildren()` and `GetChildAt(i)`
+- Geometry via `widget->GetCachedGeometry()`
+- Type via `widget->GetTypeAsString()` (returns class name like "SWindow")
+
+**AI-First Design Works:**
+- Zero abstraction = AI maps directly to UE documentation
+- RAW Slate types in responses = no mental translation needed
+- Tool names match UE operations = predictable patterns
+
+### Status: Phase 3A Complete! ✅
+
+**Success Criteria Met:**
+1. ✅ AI can query full UI hierarchy
+2. ✅ Returns native Slate terminology
+3. ✅ Thread-safe implementation
+4. ✅ Configurable traversal depth
+5. ✅ Stdio accessible (all AI tools can use)
+6. ✅ MCP auto-discovery
+
+**Next:** Phase 3B/C - UI Control & Workflows
+- Widget query by path
+- Widget search by criteria
+- UI actions (click, type, invoke)
