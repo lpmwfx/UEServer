@@ -210,6 +210,166 @@ More operations coming soon (list widgets, trigger actions, inspect properties).
 - **Thin MCP Layer**: MCP adapter is transport-focused; no duplicate business logic
 - **Stable Contracts**: Use explicit API contracts to avoid UI/engine coupling
 - **Automation-Friendly**: Clear logging and deterministic responses
+- **Zero Abstraction**: Return RAW UE/Slate terminology (AI-UX first, not human brevity)
+- **Bridge not DSL**: ue-server is an accessibility layer to existing UE API, not a new language
+
+## Development Methodology
+
+This project uses **TODO-Driven Dynamic Development** - a methodology optimized for AI-assisted development that combines structure with adaptability.
+
+### Core Principles
+
+1. **TODO as Contract**
+   - `TODO` file defines current phase with clear success criteria
+   - Each task has explicit definition of "done"
+   - No ambiguity about scope or acceptance
+
+2. **Dynamic Adaptation**
+   - TODO evolves as work progresses
+   - New challenges discovered → add tasks immediately
+   - Design insights emerge → document in real-time
+   - **Flexibility within structure**
+
+3. **Triple Documentation**
+   - **TODO**: What needs doing (future-facing)
+   - **CHANGELOG**: What was done (past-facing, user perspective)
+   - **RAG**: How and why (knowledge base, developer perspective)
+
+4. **Trailing Documentation**
+   - Document AFTER implementation, not before
+   - Capture actual decisions made, not speculative plans
+   - Include real examples from live testing
+   - Record both successes and failures
+
+### Workflow Example (Phase 3A)
+
+**Initial TODO:**
+```markdown
+- [ ] Implement ue.ui.get_tree operation
+  - Traverse Slate widget hierarchy
+  - Return structured JSON
+```
+
+**During Development:**
+- Threading issue discovered → add task: "Fix threading - dispatch to Game Thread"
+- Design philosophy crystallizes → document: "Zero abstraction principle"
+- Testing reveals edge case → add verification task
+
+**After Completion:**
+- TODO: Mark tasks complete, add `ue.switchboard` for next iteration
+- CHANGELOG: Add Phase 3A section with features, testing results, example response
+- RAG: Document threading challenge, solution pattern, key learnings
+
+### Files and Roles
+
+**TODO** - Current phase task list
+- Living document (changes during development)
+- Checkbox tasks with clear acceptance criteria
+- Next priorities visible
+- Example: Phase 3A checkbox items → Phase 3B goals
+
+**CHANGELOG** - User-facing history
+- What was added/changed/fixed
+- Testing results and verification
+- Example responses
+- Status markers (✅ Complete!)
+
+**RAG** - Developer knowledge base
+- Implementation details and patterns
+- Challenges encountered and solutions
+- Code examples and API usage
+- Web research findings and links
+
+**CLAUDE.md** - AI development guidance
+- Project overview and architecture
+- Technology stack and conventions
+- Current phase and priorities
+- Key design decisions
+
+### TodoWrite Tool Integration
+
+When working with AI assistants (especially Claude Code):
+
+1. **Create TODO items** at session start for multi-step tasks
+2. **Mark in_progress** when starting a task (only ONE at a time)
+3. **Mark completed** IMMEDIATELY after finishing (don't batch)
+4. **Add new tasks** as discoveries happen
+5. **Clean up** obsolete tasks if goals change
+
+Example from Phase 3A:
+```
+[1. completed] Research Slate UI API
+[2. completed] Implement ue.ui.get_tree in C++
+[3. in_progress] Fix threading issue (discovered during testing!)
+[4. pending] Test with UE5 running
+```
+
+### Benefits for AI-Assisted Development
+
+**For AI Agents:**
+- ✅ Clear execution roadmap
+- ✅ Transparent progress tracking
+- ✅ Accountability mechanism (TodoWrite tool)
+- ✅ Context for resuming after interruptions
+
+**For Developers:**
+- ✅ Visible progress in real-time
+- ✅ Clear next steps always defined
+- ✅ Knowledge capture happens automatically
+- ✅ Easy to pause/resume work
+
+**For Projects:**
+- ✅ Historical record of actual work done
+- ✅ Decisions documented with context
+- ✅ Patterns emerge and get codified
+- ✅ Onboarding material writes itself
+
+### Comparison to Traditional Methods
+
+| Aspect | Waterfall | Agile | TODO-Driven Dynamic |
+|--------|-----------|-------|---------------------|
+| Planning | Upfront, detailed | Sprint-based | Phase-based, evolving |
+| Documentation | Before coding | Minimal, after | During + after (triple) |
+| Adaptation | Difficult | Sprint boundaries | Continuous, immediate |
+| AI Suitability | Poor (too rigid) | Good | Excellent (transparent) |
+| Knowledge Capture | Separate docs | Tribal knowledge | Automatic (RAG) |
+
+### Anti-Patterns to Avoid
+
+❌ **Batch completions** - Mark tasks done immediately, not at end of session
+❌ **Speculative docs** - Don't document what you PLAN to do, document what you DID
+❌ **TODO bloat** - Keep next phase focused, don't plan 3 phases ahead
+❌ **Forgotten updates** - Update TODO/CHANGELOG/RAG as you work, not days later
+❌ **Vague tasks** - "Improve performance" → "Dispatch UI queries to Game Thread (threading fix)"
+
+### Real Example: Phase 3A Threading Fix
+
+**Problem discovered during implementation:**
+```
+Assertion failed: IsInGameThread() || IsInSlateThread()
+```
+
+**Immediate response:**
+1. Add TODO task: "Fix threading issue - dispatch to Game Thread"
+2. Mark it `in_progress`
+3. Implement fix: `AsyncTask(ENamedThreads::GameThread)` + `TPromise`/`TFuture`
+4. Test fix, verify no crashes
+5. Mark task `completed`
+6. Document in CHANGELOG: "Threading fix for Slate API access"
+7. Document in RAG: Code pattern, why it works, what we learned
+
+**Result:** Issue → Solution → Knowledge, all tracked and documented.
+
+### Getting Started with This Method
+
+1. **Read TODO** - Understand current phase and tasks
+2. **Pick one task** - Mark it `in_progress` (use TodoWrite if AI-assisted)
+3. **Work on it** - Solve problems as they emerge
+4. **Adapt TODO** - Add new tasks discovered during work
+5. **Document** - Update CHANGELOG/RAG with what you actually did
+6. **Repeat** - Next task, iterate
+
+This methodology enables **emergent design through iterative execution with clear accountability** - perfect for AI-assisted development where the AI needs structure but humans need flexibility.
 
 ## Current Status
 
@@ -276,4 +436,4 @@ Copyright TwistedBrain. All Rights Reserved.
 
 **Created by**: TwistedBrain and Claude Sonnet 4.5
 **Version**: 0.1.0
-**Last Updated**: 2025-12-26
+**Last Updated**: 2025-12-27
