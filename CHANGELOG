@@ -525,14 +525,88 @@ switchboard.json only contains live instances, making discovery robust.
 }
 ```
 
-### Next: Phase 3B/C - UI Control & Workflows
+### Added - 2025-12-27 (Session 9 - Phase 3B: Widget Query)
 
-**Phase 3B Goals:**
+#### Phase 3B: UI Inspection - ue.ui.get_widget
+
+**RPC Server (C++):**
+- Implemented `ui.get_widget` operation in `UEServerRPC.cpp`
+  - Accepts `path` parameter with "/" separator (e.g., "SWindow/SOverlay/SButton")
+  - Fuzzy matching via `Contains()` for widget type and accessible text
+  - Traverses widget hierarchy depth-first
+  - Returns widget properties with immediate children (depth=2)
+  - Thread-safe: dispatches to Game Thread via `AsyncTask` + `TPromise`/`TFuture`
+  - Clear error messages when widget not found
+
+- Implemented `FindWidgetByPath()` helper method
+  - Splits path by "/" into components
+  - Searches top-level windows for first component match
+  - Recursively traverses children for subsequent components
+  - Matches widgets by type name OR accessible text (flexible)
+  - Returns nullptr if path component not found
+
+**Bridge (Python):**
+- Implemented `ue.ui.get_widget` tool in `tools.py`
+  - Validates required `path` parameter
+  - Calls RPC `ui.get_widget` operation
+  - Returns widget details or clear error message
+  - Registered in `TOOL_HANDLERS` for auto-discovery
+
+**Testing:**
+- ✅ Built plugin successfully in UETRAIL project
+- ✅ CLI mode: `ue-bridge ue.ui.get_widget path=SWindow` ✅
+- ✅ Stdio mode: `echo '{"tool":"ue.ui.get_widget","args":{"path":"SWindow"}}' | ue-bridge` ✅
+- ✅ Path traversal: `path=SWindow/SOverlay` finds nested widgets ✅
+- ✅ Error handling: Invalid paths return clear errors ✅
+- ✅ MCP auto-discovers tool (6 tools total) ✅
+
+**Example Response (success):**
+```json
+{
+  "ok": true,
+  "path": "SWindow/SOverlay",
+  "widget": {
+    "type": "SOverlay",
+    "visible": true,
+    "enabled": true,
+    "geometry": {"x": 384, "y": 296, "width": 1286, "height": 726},
+    "children": [
+      {"type": "SImage", "visible": true, ...},
+      {"type": "SVerticalBox", "visible": true, ...}
+    ],
+    "child_count": 5
+  }
+}
+```
+
+**Example Response (not found):**
+```json
+{
+  "ok": false,
+  "path": "InvalidWidget",
+  "error": "Widget not found: InvalidWidget"
+}
+```
+
+### Status - Phase 3B Widget Query Complete! ✅
+
+**Success Criteria Met:**
+1. ✅ AI can find specific widgets by path
+2. ✅ Path traversal with fuzzy matching works reliably
+3. ✅ Returns detailed widget properties
+4. ✅ Error handling is robust
+5. ✅ Works via CLI and stdio (MCP ready)
+6. ✅ Thread-safe Game Thread dispatch
+
+### Next: Phase 3B Remaining - Widget Search & UI Control
+
+**Next Tasks (Phase 3B):**
+- Widget search (`ue.ui.find_widgets`) - Search by criteria
 - UI control operations (`ue.ui.click`, `ue.ui.type`, `ue.ui.invoke`)
 - Action simulation in Slate
 - Safety and validation
 
-**Phase 3C Goals:**
+**Future (Phase 3C):**
 - High-level workflows (content browser, menus, viewport)
 - Common editor operations
 

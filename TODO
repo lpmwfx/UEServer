@@ -57,13 +57,24 @@ Claude Code → MCP → Bridge → RPC Server → UE Slate UI System
   - ✅ No port discovery needed (reads from file system)
   - ✅ Auto-discovered by MCP
 
-### Phase 3B: Remaining UI Inspection Features
+### Phase 3B: UI Inspection - Widget Query ✅ COMPLETE
 
-- [ ] **RPC: Widget Query by Path**
-  - Implement `ue.ui.get_widget` operation
-  - Accept widget path (e.g., "MainFrame/MenuBar/File")
-  - Return detailed widget properties
-  - Support for wildcard/fuzzy matching
+- [x] **RPC: Widget Query by Path**
+  - ✅ Implemented `ue.ui.get_widget` operation
+  - ✅ Accepts widget path with "/" separator (e.g., "SWindow/SOverlay/SButton")
+  - ✅ Returns detailed widget properties with immediate children (depth=2)
+  - ✅ Fuzzy matching via Contains() for widget type and accessible text
+  - ✅ Thread-safe: dispatches to Game Thread via AsyncTask
+  - ✅ Clear error messages when widget not found
+
+**Testing Results:**
+- ✅ CLI mode: `ue-bridge ue.ui.get_widget path=SWindow` works
+- ✅ Stdio mode: `echo '{"tool":"ue.ui.get_widget","args":{"path":"SWindow"}}' | ue-bridge` works
+- ✅ Path traversal: `path=SWindow/SOverlay` correctly finds nested widgets
+- ✅ Error handling: Invalid paths return clear error messages
+- ✅ MCP auto-discovers tool (6 tools total now)
+
+### Phase 3B: Remaining UI Inspection Features
 
 - [ ] **RPC: Widget Search**
   - Implement `ue.ui.find_widgets` operation
