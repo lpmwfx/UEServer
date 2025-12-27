@@ -239,6 +239,52 @@ See BlenderServer's UI automation (if available) for:
 3. **Build Workflows (Phase 3C)** - High-level, AI-friendly
 4. **Iterate based on usage** - AI:DevOps methodology
 
+### AI Multimodal UX (Critical Design Principle)
+
+**VIGTIG:** AI-UX skal gå BEGGE VEJE - AI kan både kontrollere OG sanse.
+
+**Nuværende Status (Kun Kontrol):**
+- ✅ AI → UE: Send kommandoer via RPC (ping, ui.get_tree, ui.get_widget)
+- ❌ UE → AI: Ingen visuel feedback endnu
+
+**Manglende: AI Sensing Capabilities**
+
+#### 1. Viewport Screenshots/Captures
+- [ ] **RPC: ue.viewport.capture operation**
+  - Capture UE viewport til PNG/JPG
+  - Return base64-encoded image eller filepath
+  - AI får multimodal feedback på sine handlinger
+  - Use case: "Did that button I clicked work? Let me SEE the result"
+
+#### 2. UI State Dumps (Bedre end ui.get_tree)
+- [ ] **Evaluér om ui.get_tree er for grov**
+  - Nuværende: Returnerer widget hierarchy med basic properties
+  - Problem: Måske mangler detaljer AI har brug for?
+  - Løsning: AI kan kode sine egne dump scripts (via executePython/Blueprint)
+
+- [ ] **RPC: ue.execute_python eller ue.execute_blueprint**
+  - Tillad AI at køre custom Python/Blueprint code
+  - AI genererer sine EGNE data-dumps præcis som den har brug for
+  - Mønster fra BlenderServer: "AI koder sin egen data-dump"
+  - Mere fleksibelt end forudbyggede dump operations
+
+#### 3. Video Capture (Animation Verification)
+- [ ] **RPC: ue.viewport.record operation**
+  - Record viewport animation til MP4
+  - AI kan verificere animationer og workflows
+  - Use case: "Play this sequence and let me watch the result"
+
+**Design Philosophy:**
+- Forudbyggede operations (ui.get_tree) er **startpunkter**
+- AI udvikler sine EGNE tools via script execution
+- Multimodal feedback (screenshots, video) er **kritisk** for AI-UX
+- Ikke afhængig af at vi bygger "den perfekte dump" - AI koder sin egen
+
+**BlenderServer Reference:**
+- Screenshot artifacts: `/tmp/blender-capture/codex_still.png`
+- Video artifacts: `/tmp/blender-capture/codex_anim.mp4`
+- AI bruger visuel feedback til at verificere resultater
+
 ### Harmonization with BlenderServer (Optional Enhancements)
 
 **Goal:** Maintain consistency with BlenderServer reference architecture without rigid adherence.
