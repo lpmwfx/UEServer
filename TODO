@@ -285,6 +285,152 @@ See BlenderServer's UI automation (if available) for:
 - Video artifacts: `/tmp/blender-capture/codex_anim.mp4`
 - AI bruger visuel feedback til at verificere resultater
 
+### Scripting Layers (Design Decision Needed)
+
+**Spørgsmål:** Hvor skal AI-scripting leve? Tre muligheder:
+
+#### Option A: UE Engine Scripting (Native Execution)
+
+**1. Python i UE5 (unreal.py):**
+```python
+# RPC Operation: ue.execute_python
+{
+  "op": "execute_python",
+  "code": "import unreal; editor = unreal.EditorLevelLibrary(); ..."
+}
+```
+- ✅ Fuld UE Python API adgang (unreal module)
+- ✅ Kører direkte i UE runtime
+- ✅ AI koder custom dumps/tools i Python
+- ⚠️ Security: Arbitrary code execution (whitelist needed)
+- 📝 Pattern: Som BlenderServer's `executePython`
+
+**2. Blueprint Execution:**
+```json
+# RPC Operation: ue.execute_blueprint
+{
+  "op": "execute_blueprint",
+  "blueprint_path": "/Game/AI/CustomDump.uasset",
+  "params": {"detail_level": "full"}
+}
+```
+- ✅ Native UE Blueprint system
+- ✅ Visual scripting familiær for UE users
+- ✅ Type-safe, sandboxed
+- ❌ AI skal generere Blueprint JSON (komplekst)
+
+**3. Console Commands:**
+```cpp
+// RPC Operation: ue.execute_console
+{
+  "op": "execute_console",
+  "command": "stat fps; r.ScreenPercentage 50"
+}
+```
+- ✅ Simple, UE-native commands
+- ✅ Debugging, performance tuning
+- ⚠️ Limited til console command API
+
+#### Option B: Bridge Scripting (Python Orchestration)
+
+**Bridge-level Python scripts:**
+```python
+# bridge/ue_scripts/custom_ui_dump.py
+async def dump_ui_with_screenshots(ctx):
+    tree = await ue_ui_get_tree({}, ctx)
+    screenshot = await ue_viewport_capture({}, ctx)
+    # Combine results, custom processing
+    return {"tree": tree, "visual": screenshot}
+
+# Tool: ue.run_bridge_script
+```
+- ✅ Type-safe Python med mypy
+- ✅ Kan komponere multiple RPC calls
+- ✅ Platform-agnostisk (virker med både UE og Blender patterns)
+- ✅ Easy debugging (Python debugger)
+- ❌ Ingen direkte UE API adgang (kun via RPC)
+
+#### FUNDAMENTAL INDSIGT: "Ren BPY er gud"
+
+**Fra BlenderServer erfaring:**
+> "BlenderServer er et ultimativet scripting af-abstraktionssystem - alt andet er bare tilbehør - ren BPY er gud"
+
+**Hvad dette betyder:**
+- **KERNE**: `executePython` med fuld bpy API adgang
+- **Tilbehør**: `addPrimitive`, `moveObject`, `listObjects` - convenience for at komme i gang
+- **Real power**: AI koder sine EGNE operations via ren bpy
+- **Zero abstraktion**: Direkte adgang til engine API, ingen mellemmænd
+
+**For UEServer:**
+- **KERNE**: `ue.execute_python` med fuld `unreal` module adgang
+- **Tilbehør**: `ui.get_tree`, `ui.get_widget` - starter hjælp
+- **Real power**: AI koder sine egne UI dumps, workflows, tools
+- **Pattern**: Samme som BlenderServer - minimal abstraktion, maximal API adgang
+
+**Prioritering:**
+1. ⭐ **execute_python** - DETTE ER FUNDAMENTET
+2. 📦 Primitive operations - Kun til onboarding
+3. 🎯 AI lærer selv resten via scripting
+
+#### Option C: Hybrid (Begge Dele) ⭐ KORREKT ARKITEKTUR
+
+**Kombiner styrker:**
+1. **UE Python** - Engine-native operations, custom dumps
+2. **Bridge Scripts** - High-level orchestration, workflows
+3. **Whitelisting** - Sikkerhed på begge lag
+
+**Architecture:**
+```
+AI → Bridge → ue.execute_python → UE Python Runtime (unreal.py)
+AI → Bridge → ue.run_bridge_script → Bridge Python → Multiple RPC calls
+```
+
+**Use Cases:**
+- **Engine-native dumps**: `ue.execute_python` med unreal.py
+- **Complex workflows**: `ue.run_bridge_script` orchestration
+- **Quick commands**: `ue.execute_console`
+
+**Security Model (fra BlenderServer):**
+```python
+# Whitelisted directories:
+- /ue-scripts/     # Bridge scripts
+- /bpy-scripts/    # UE Python scripts (project-specific)
+
+# Environment variables:
+UESERVER_ALLOW_EXEC=true   # Enable execute_python
+UESERVER_SCRIPT_DIRS=/path/to/project/bpy-scripts
+```
+
+#### Implementation Checklist
+
+- [ ] **Phase 1: UE Python Execution**
+  - [ ] RPC: `execute_python` operation in UEServerRPC.cpp
+  - [ ] Execute Python in UE Python interpreter context
+  - [ ] Capture stdout, stderr, return value
+  - [ ] Whitelist /bpy-scripts directories
+  - [ ] Bridge: `ue.execute_python` tool
+
+- [ ] **Phase 2: Bridge Scripting**
+  - [ ] Create `/ue-scripts` directory structure
+  - [ ] Bridge: `ue.run_bridge_script` tool
+  - [ ] Load Python scripts from whitelisted paths
+  - [ ] Async orchestration of RPC calls
+
+- [ ] **Phase 3: Script Management**
+  - [ ] `ue.save_script` - Save to whitelisted directory
+  - [ ] `ue.load_script` - Load and execute
+  - [ ] `ue.list_scripts` - List available scripts
+  - [ ] Pattern: Exactly like BlenderServer
+
+**BlenderServer Reference:**
+```python
+# tools.py har allerede dette pattern:
+blender.executePython(code="import bpy; ...")
+blender.loadScript(filepath="bpy-scripts/my_tool.py")
+blender.saveScript(filepath="bpy-scripts/new_tool.py", content="...")
+blender.listScripts()
+```
+
 ### Harmonization with BlenderServer (Optional Enhancements)
 
 **Goal:** Maintain consistency with BlenderServer reference architecture without rigid adherence.
