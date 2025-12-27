@@ -46,14 +46,16 @@ Claude Code → MCP → Bridge → RPC Server → UE Slate UI System
   - ✅ Thread-safe - no crashes
   - ✅ Works via stdio (REPO and PROD)
 
-**Next Priority: Switchboard Visibility**
+**Switchboard Visibility** ✅ COMPLETE
 
-- [ ] **Bridge: Switchboard Inspection**
-  - Implement `ue.switchboard` tool
-  - Returns current switchboard state from `~/.ueserver/switchboard.json`
-  - Shows all running UE instances: pid, port, project, started time
-  - Makes port discovery transparent and debuggable
-  - Usage: `ue-bridge ue.switchboard` or via MCP
+- [x] **Bridge: Switchboard Inspection**
+  - ✅ Implemented `ue.switchboard` tool
+  - ✅ Returns current switchboard state from `~/.ueserver/switchboard.json`
+  - ✅ Shows all running UE instances: pid, port, project, started time, alive status
+  - ✅ Makes port discovery transparent and debuggable
+  - ✅ Works via CLI and stdio
+  - ✅ No port discovery needed (reads from file system)
+  - ✅ Auto-discovered by MCP
 
 ### Phase 3B: Remaining UI Inspection Features
 
