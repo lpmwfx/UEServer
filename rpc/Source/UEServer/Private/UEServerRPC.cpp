@@ -15,6 +15,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SWindow.h"
+#include "Async/Async.h"
 
 FUEServerRPC::FUEServerRPC()
 	: ListenerSocket(nullptr)
@@ -466,55 +467,67 @@ FString FUEServerRPC::HandleUIGetTree(const TSharedPtr<FJsonObject>& Request)
 		MaxDepth = Request->GetIntegerField(TEXT("max_depth"));
 	}
 
-	// Build response
-	TSharedPtr<FJsonObject> Response = MakeShared<FJsonObject>();
+	FString RequestId = Request->HasField(TEXT("id")) ? Request->GetStringField(TEXT("id")) : TEXT("");
 
-	// Add id if present in request
-	if (Request->HasField(TEXT("id")))
-	{
-		Response->SetStringField(TEXT("id"), Request->GetStringField(TEXT("id")));
-	}
+	// UI queries MUST run on Game Thread
+	// Use TPromise to synchronously wait for result from Game Thread
+	TPromise<FString> Promise;
+	TFuture<FString> Future = Promise.GetFuture();
 
-	Response->SetStringField(TEXT("op"), TEXT("ui.get_tree"));
+	AsyncTask(ENamedThreads::GameThread, [this, MaxDepth, RequestId, Promise = MoveTemp(Promise)]() mutable {
+		// Build response on Game Thread
+		TSharedPtr<FJsonObject> Response = MakeShared<FJsonObject>();
 
-	// Check if Slate application is available
-	if (!FSlateApplication::IsInitialized())
-	{
-		Response->SetBoolField(TEXT("ok"), false);
-		Response->SetStringField(TEXT("error"), TEXT("Slate application not initialized"));
+		if (!RequestId.IsEmpty())
+		{
+			Response->SetStringField(TEXT("id"), RequestId);
+		}
 
+		Response->SetStringField(TEXT("op"), TEXT("ui.get_tree"));
+
+		// Check if Slate application is available
+		if (!FSlateApplication::IsInitialized())
+		{
+			Response->SetBoolField(TEXT("ok"), false);
+			Response->SetStringField(TEXT("error"), TEXT("Slate application not initialized"));
+
+			FString OutputString;
+			TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+				TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+			FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+			Promise.SetValue(OutputString);
+			return;
+		}
+
+		// Get all top-level windows
+		TArray<TSharedRef<SWindow>> Windows;
+		FSlateApplication::Get().GetAllVisibleWindowsOrdered(Windows);
+
+		// Serialize windows as array
+		TArray<TSharedPtr<FJsonValue>> WindowsArray;
+		for (const TSharedRef<SWindow>& Window : Windows)
+		{
+			TSharedPtr<FJsonObject> WindowObj = SerializeWidget(Window, MaxDepth, 0);
+			if (WindowObj.IsValid())
+			{
+				WindowsArray.Add(MakeShared<FJsonValueObject>(WindowObj));
+			}
+		}
+
+		Response->SetBoolField(TEXT("ok"), true);
+		Response->SetArrayField(TEXT("windows"), WindowsArray);
+		Response->SetNumberField(TEXT("window_count"), Windows.Num());
+
+		// Serialize response
 		FString OutputString;
 		TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
 			TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
 		FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
-		return OutputString;
-	}
+		Promise.SetValue(OutputString);
+	});
 
-	// Get all top-level windows
-	TArray<TSharedRef<SWindow>> Windows;
-	FSlateApplication::Get().GetAllVisibleWindowsOrdered(Windows);
-
-	// Serialize windows as array
-	TArray<TSharedPtr<FJsonValue>> WindowsArray;
-	for (const TSharedRef<SWindow>& Window : Windows)
-	{
-		TSharedPtr<FJsonObject> WindowObj = SerializeWidget(Window, MaxDepth, 0);
-		if (WindowObj.IsValid())
-		{
-			WindowsArray.Add(MakeShared<FJsonValueObject>(WindowObj));
-		}
-	}
-
-	Response->SetBoolField(TEXT("ok"), true);
-	Response->SetArrayField(TEXT("windows"), WindowsArray);
-	Response->SetNumberField(TEXT("window_count"), Windows.Num());
-
-	// Serialize response
-	FString OutputString;
-	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
-		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
-	FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
-	return OutputString;
+	// Wait for Game Thread to complete (blocks RPC thread)
+	return Future.Get();
 }
 
 TSharedPtr<FJsonObject> FUEServerRPC::SerializeWidget(TSharedPtr<SWidget> Widget, int32 MaxDepth, int32 CurrentDepth)
