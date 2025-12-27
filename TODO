@@ -239,6 +239,41 @@ See BlenderServer's UI automation (if available) for:
 3. **Build Workflows (Phase 3C)** - High-level, AI-friendly
 4. **Iterate based on usage** - AI:DevOps methodology
 
+### Harmonization with BlenderServer (Optional Enhancements)
+
+**Goal:** Maintain consistency with BlenderServer reference architecture without rigid adherence.
+
+**Completed:**
+- ✅ TOOL_METADATA structure added to bridge/ue_bridge/tools.py
+- ✅ MCP server.py updated to use TOOL_METADATA
+- ✅ Proper JSON schemas for all 6 tools
+- ✅ Required fields marked in schemas (e.g., path for ue.ui.get_widget)
+
+**Optional Future Enhancements:**
+
+#### Documentation System (Low Priority)
+- [ ] **Add docs.py module** (inspired by BlenderServer)
+  - Man pages for key concepts (e.g., "switchboard", "slate-ui", "project-setup")
+  - How-to guides for common workflows (e.g., "start-ue-rpc", "query-ui-widgets")
+  - Accessible via bridge CLI and MCP
+  - TypedDict structures: ManPage, HowTo
+  - Functions: get_manpage(), get_howto(), list_manpages(), list_howtos()
+
+- [ ] **Add ue.help, ue.man, ue.howto tools**
+  - ue.help - Overview of UEServer system
+  - ue.man topic=<name> - Get manual page
+  - ue.howto topic=<name> - Get how-to guide
+  - Improves AI discoverability
+
+#### Input Validation (Low Priority)
+- [ ] **Add validators.py module** (if needed)
+  - Reusable validation functions: require_string(), optional_string()
+  - Vector validation: require_vec3(), optional_vec3() (for future geometry tools)
+  - Use in tools.py to validate inputs before RPC calls
+  - Reduces validation duplication
+
+**Note:** These are OPTIONAL enhancements for better AI-UX. Core functionality is complete.
+
 ### Next Steps After Phase 3
 
 Determined by AI agent needs:
