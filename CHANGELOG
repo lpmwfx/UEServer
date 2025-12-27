@@ -403,13 +403,80 @@ switchboard.json only contains live instances, making discovery robust.
 4. ✅ Automated UE5 startup capability
 5. ✅ Ready to begin Phase 3 (UI Automation)
 
-### Next: Phase 3 - UI Inspection/Control
+### Added - 2025-12-27 (Session 8 - Phase 3A Complete!)
 
-**Phase 3A Goals:**
-- UI widget hierarchy inspection (`ue.ui.get_tree`)
-- Widget query by path (`ue.ui.get_widget`)
-- Widget search by criteria (`ue.ui.find_widgets`)
-- Slate UI traversal implementation in C++
+#### Phase 3A: UI Discovery & Inspection - ue.ui.get_tree
+
+**RPC Server (C++):**
+- Implemented `ui.get_tree` operation in `UEServerRPC.cpp`
+  - Traverses Slate widget hierarchy from all visible windows
+  - Returns structured JSON tree with widget metadata
+  - Widget properties: type (SWindow, SButton, etc.), visibility, enabled state, geometry (x, y, width, height), text content, children
+  - Configurable `max_depth` parameter (default: 10) to control recursion
+  - Thread-safe: dispatches to Game Thread via `AsyncTask(ENamedThreads::GameThread)`
+  - Uses `TPromise`/`TFuture` for synchronous wait from RPC thread
+
+- Added `SerializeWidget` helper function
+  - Recursive widget serialization
+  - Captures widget type via `GetTypeAsString()`
+  - Extracts geometry via `GetCachedGeometry()`
+  - Gets accessible text via `GetAccessibleText()`
+  - Traverses children via `GetChildren()` and `GetChildAt()`
+
+- Threading fix for Slate API access
+  - Problem: `FSlateApplication::Get()` can only be called from Game/Slate threads
+  - Solution: RPC thread dispatches UI query to Game Thread, waits for completion
+  - Pattern: `AsyncTask` + `TPromise`/`TFuture` for cross-thread synchronization
+
+**Bridge (Python):**
+- Implemented `ue.ui.get_tree` tool in `tools.py`
+  - Calls RPC `ui.get_tree` operation
+  - Passes `max_depth` parameter
+  - Returns widget hierarchy as JSON
+
+**Design Philosophy:**
+- **Zero Abstraction**: Returns RAW Slate terminology (SWindow, SOverlay, geometry, etc.)
+- **AI-UX First**: AI reads UE docs → understands our responses directly
+- **Bridge not DSL**: ue-server is an accessibility layer to existing UE/Slate API, not a new language
+
+**Testing:**
+- ✅ Tested with live UE5 Editor (UETRAIL project)
+- ✅ Returns 3 top-level windows (main editor + notification windows)
+- ✅ Widget tree depth configurable (tested with depth=1, depth=2)
+- ✅ Works via bridge CLI stdio (both REPO and PROD)
+- ✅ Thread-safe - no crashes with Slate API calls
+- ✅ MCP auto-discovers new tool (zero config changes needed)
+
+**Example Response:**
+```json
+{
+  "ok": true,
+  "windows": [
+    {
+      "type": "SWindow",
+      "visible": true,
+      "enabled": true,
+      "geometry": {"x": 384, "y": 296, "width": 1286, "height": 726},
+      "text": "UETRAIL - Unreal Editor",
+      "children": [...],
+      "child_count": 1
+    }
+  ],
+  "window_count": 3
+}
+```
+
+### Status - Phase 3A Complete! ✅
+
+**Success Criteria Met:**
+1. ✅ AI can query full UI hierarchy of UE Editor
+2. ✅ Returns Slate widget tree with native terminology
+3. ✅ Thread-safe Slate API access
+4. ✅ Configurable traversal depth
+5. ✅ Works via stdio (accessible to all AI tools)
+6. ✅ MCP integration automatic
+
+### Next: Phase 3B/C - UI Control & Workflows
 
 **Phase 3B Goals:**
 - UI control operations (`ue.ui.click`, `ue.ui.type`, `ue.ui.invoke`)
