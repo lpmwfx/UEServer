@@ -476,6 +476,55 @@ switchboard.json only contains live instances, making discovery robust.
 5. ✅ Works via stdio (accessible to all AI tools)
 6. ✅ MCP integration automatic
 
+### Added - 2025-12-27 (Session 8 continued - ue.switchboard)
+
+#### Switchboard Visibility Tool
+
+**Bridge (Python):**
+- Implemented `ue.switchboard` tool in `tools.py`
+  - Reads switchboard state from `~/.ueserver/switchboard.json`
+  - Returns all running UE instances with metadata
+  - Instance properties: pid, port, project, project_name, started, alive
+  - Checks process alive status via `os.kill(pid, 0)`
+  - No port discovery required (reads from file system)
+
+**CLI Enhancement:**
+- Added `ue.switchboard` to special cases in `cli.py`
+  - Bypasses port discovery (tool doesn't need running UE)
+  - Works alongside `ue.start` as pre-connection tool
+
+**Purpose:**
+- Makes port discovery transparent and debuggable
+- AI can inspect switchboard state without bash commands
+- Useful for multi-instance debugging
+- Shows which UE instances are alive vs stale
+
+**Testing:**
+- ✅ CLI mode: `ue-bridge ue.switchboard`
+- ✅ Stdio mode: `echo '{"tool":"ue.switchboard"}' | ue-bridge`
+- ✅ Shows 1 running instance (UETRAIL project, port 41319)
+- ✅ Alive status correctly detected
+- ✅ MCP auto-discovers tool
+
+**Example Response:**
+```json
+{
+  "ok": true,
+  "switchboard_path": "/home/lpm/.ueserver/switchboard.json",
+  "instances": [
+    {
+      "pid": 71305,
+      "port": 41319,
+      "project": "../../../../../REPO/UETRAIL/UETRAIL.uproject",
+      "project_name": "UETRAIL",
+      "started": "2025-12-27T12:37:51.526Z",
+      "alive": true
+    }
+  ],
+  "instance_count": 1
+}
+```
+
 ### Next: Phase 3B/C - UI Control & Workflows
 
 **Phase 3B Goals:**
