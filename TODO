@@ -18,20 +18,44 @@ Claude Code → MCP → Bridge → RPC Server → UE Slate UI System
 2. **UI Control** - Trigger actions and modify state
 3. **AI-Friendly Patterns** - Make UI discoverable and actionable for AI agents
 
-### Phase 3A: UI Discovery & Inspection
+### Phase 3A: UI Discovery & Inspection ✅ COMPLETE
 
 **Goal:** AI can "see" the UE Editor UI structure and query properties.
 
-- [ ] **RPC: UI Tree Inspection**
-  - Implement `ue.ui.get_tree` operation
-  - Traverse Slate widget hierarchy from root
-  - Return structured JSON tree with widget info:
-    - Widget type (e.g., SButton, STextBlock, SWindow)
-    - Widget identifier (if available)
-    - Visibility state
-    - Position and size
-    - Text content (if applicable)
-    - Parent-child relationships
+- [x] **RPC: UI Tree Inspection**
+  - ✅ Implemented `ue.ui.get_tree` operation
+  - ✅ Traverses Slate widget hierarchy from all visible windows
+  - ✅ Returns structured JSON tree with widget info:
+    - Widget type (e.g., SWindow, SButton, SOverlay)
+    - Visibility state (visible, enabled)
+    - Position and size (geometry: x, y, width, height)
+    - Text content (via GetAccessibleText())
+    - Parent-child relationships (recursive children array)
+  - ✅ Thread-safe: dispatches to Game Thread via AsyncTask
+  - ✅ Configurable max_depth parameter (default: 10)
+
+- [x] **Bridge: UI Inspection Tools**
+  - ✅ `ue.ui.get_tree` - Get full UI hierarchy
+  - ✅ Type-safe response handling
+  - ✅ Auto-discovered by MCP
+
+- [x] **Testing: UI Inspection**
+  - ✅ Tested with live UE5 Editor (UETRAIL project)
+  - ✅ Returns 3 windows (main editor + notification windows)
+  - ✅ Widget tree depth configurable
+  - ✅ Thread-safe - no crashes
+  - ✅ Works via stdio (REPO and PROD)
+
+**Next Priority: Switchboard Visibility**
+
+- [ ] **Bridge: Switchboard Inspection**
+  - Implement `ue.switchboard` tool
+  - Returns current switchboard state from `~/.ueserver/switchboard.json`
+  - Shows all running UE instances: pid, port, project, started time
+  - Makes port discovery transparent and debuggable
+  - Usage: `ue-bridge ue.switchboard` or via MCP
+
+### Phase 3B: Remaining UI Inspection Features
 
 - [ ] **RPC: Widget Query by Path**
   - Implement `ue.ui.get_widget` operation
@@ -47,18 +71,6 @@ Claude Code → MCP → Bridge → RPC Server → UE Slate UI System
     - Visibility state
     - Custom properties
   - Return array of matching widgets with paths
-
-- [ ] **Bridge: UI Inspection Tools**
-  - `ue.ui.tree` - Get full UI hierarchy
-  - `ue.ui.get` - Get specific widget by path
-  - `ue.ui.find` - Search for widgets
-  - Type-safe response handling
-
-- [ ] **Testing: UI Inspection**
-  - Test with UE Editor running
-  - Verify main menu structure visible
-  - Verify content browser discoverable
-  - Test widget search functionality
 
 ### Phase 3B: UI Control & Actions
 
