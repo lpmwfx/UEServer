@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from .tcp_client import call_ue
-from .types import ToolContext, ToolHandler, UEResponse
+from .types import ToolContext, ToolHandler, ToolMetadata, UEResponse
 
 
 async def ue_start(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
@@ -347,3 +347,80 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
 }
 
 TOOL_NAMES = sorted(TOOL_HANDLERS.keys())
+
+
+# Tool metadata for MCP auto-discovery with proper schemas
+TOOL_METADATA: list[ToolMetadata] = [
+    {
+        "name": "ue.start",
+        "description": "Start UE5 with UEServer plugin and wait for RPC server to be ready",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Optional path to .uproject file (default: auto-detect from CWD)",
+                },
+                "editor_path": {
+                    "type": "string",
+                    "description": "Optional path to UnrealEditor executable (default: auto-detect)",
+                },
+                "wait_timeout": {
+                    "type": "number",
+                    "description": "Timeout in seconds to wait for server (default: 30)",
+                },
+            },
+        },
+    },
+    {
+        "name": "ue.ping",
+        "description": "Ping UE RPC server to check connectivity",
+        "schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "ue.health",
+        "description": "Quick health check with short timeout (500ms)",
+        "schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "ue.ui.get_tree",
+        "description": "Get the Slate UI widget tree from Unreal Editor",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "max_depth": {
+                    "type": "number",
+                    "description": "Optional maximum recursion depth (default: 10)",
+                },
+            },
+        },
+    },
+    {
+        "name": "ue.ui.get_widget",
+        "description": "Get a specific widget by path in the Unreal Editor UI",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Widget path (e.g., 'SWindow/SOverlay/SButton')",
+                },
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "ue.switchboard",
+        "description": "Get switchboard state showing all running UE instances",
+        "schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+]

@@ -29,7 +29,7 @@ try:
 
     from ue_bridge.port_discovery import discover_port
     from ue_bridge.tcp_client import create_ue_client
-    from ue_bridge.tools import TOOL_HANDLERS, TOOL_NAMES
+    from ue_bridge.tools import TOOL_HANDLERS, TOOL_METADATA, TOOL_NAMES
 except ImportError as e:
     print(f"ERROR: Cannot import ue_bridge: {e}", file=sys.stderr)
     print("Make sure bridge is installed: pip install -e ../bridge/", file=sys.stderr)
@@ -51,25 +51,19 @@ def start_server() -> None:
     # Register list_tools handler
     @server.list_tools()  # type: ignore[no-untyped-call]
     async def list_tools() -> list[Tool]:
-        """List all available tools from bridge - auto-discovered."""
-        tools: list[Tool] = []
-        for tool_name in TOOL_NAMES:
-            handler = TOOL_HANDLERS.get(tool_name)
-            if not handler:
-                continue
-            description = handler.__doc__.strip().split("\n")[0] if handler.__doc__ else tool_name
-            tools.append(
-                Tool(
-                    name=tool_name,
-                    description=description,
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": True,
-                    },
-                )
+        """
+        List all available tools from bridge - auto-discovered.
+
+        Uses TOOL_METADATA for structured schema information.
+        """
+        return [
+            Tool(
+                name=meta["name"],
+                description=meta["description"],
+                inputSchema=meta["schema"],
             )
-        return tools
+            for meta in TOOL_METADATA
+        ]
 
     # Register single call_tool handler for ALL tools
     @server.call_tool()
