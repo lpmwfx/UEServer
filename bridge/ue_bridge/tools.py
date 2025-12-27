@@ -202,6 +202,52 @@ async def ue_ui_get_tree(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
     return await call_ue("ui.get_tree", {"max_depth": max_depth}, ctx)
 
 
+async def ue_ui_get_widget(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
+    """
+    Get a specific widget by path in the Unreal Editor UI.
+
+    Searches the widget hierarchy for a widget matching the given path.
+    Path components are matched by widget type or accessible text.
+
+    Args:
+        args: {
+            "path": Widget path (e.g., "SWindow/SOverlay/SButton")
+        }
+        ctx: Tool context with host, port, timeout
+
+    Returns:
+        Response with widget details:
+            {
+                "ok": true,
+                "path": "SWindow/SOverlay/SButton",
+                "widget": {
+                    "type": "SButton",
+                    "visible": true,
+                    "enabled": true,
+                    "geometry": {"x": 100, "y": 50, "width": 80, "height": 30},
+                    "text": "Optional text content",
+                    "children": [...immediate children...],
+                    "child_count": N
+                }
+            }
+
+        Error response if widget not found:
+            {
+                "ok": false,
+                "path": "Invalid/Path",
+                "error": "Widget not found: Invalid/Path"
+            }
+    """
+    if "path" not in args:
+        return {
+            "ok": False,
+            "error": "Missing required parameter: path",
+        }
+
+    path = args["path"]
+    return await call_ue("ui.get_widget", {"path": path}, ctx)
+
+
 async def ue_switchboard(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
     """
     Get switchboard state showing all running UE instances.
@@ -296,6 +342,7 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "ue.ping": ue_ping,
     "ue.health": ue_health,
     "ue.ui.get_tree": ue_ui_get_tree,
+    "ue.ui.get_widget": ue_ui_get_widget,
     "ue.switchboard": ue_switchboard,
 }
 

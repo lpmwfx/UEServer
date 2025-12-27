@@ -63,8 +63,14 @@ private:
 	/** RPC handler: get UI widget tree */
 	FString HandleUIGetTree(const TSharedPtr<FJsonObject>& Request);
 
+	/** RPC handler: get specific widget by path */
+	FString HandleUIGetWidget(const TSharedPtr<FJsonObject>& Request);
+
 	/** Helper: Serialize widget to JSON recursively */
 	TSharedPtr<FJsonObject> SerializeWidget(TSharedPtr<SWidget> Widget, int32 MaxDepth, int32 CurrentDepth);
+
+	/** Helper: Find widget by path (e.g., "MainFrame/MenuBar/File") */
+	TSharedPtr<SWidget> FindWidgetByPath(const FString& Path);
 
 private:
 	/** Listener socket */

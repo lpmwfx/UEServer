@@ -423,6 +423,10 @@ FString FUEServerRPC::ProcessRequest(const FString& RequestJson)
 	{
 		return HandleUIGetTree(JsonObject);
 	}
+	else if (Op == TEXT("ui.get_widget"))
+	{
+		return HandleUIGetWidget(JsonObject);
+	}
 
 	// Unknown operation
 	TSharedPtr<FJsonObject> ErrorResponse = MakeShared<FJsonObject>();
@@ -594,4 +598,170 @@ TSharedPtr<FJsonObject> FUEServerRPC::SerializeWidget(TSharedPtr<SWidget> Widget
 	}
 
 	return WidgetObj;
+}
+
+FString FUEServerRPC::HandleUIGetWidget(const TSharedPtr<FJsonObject>& Request)
+{
+	// Get required path parameter
+	if (!Request->HasField(TEXT("path")))
+	{
+		TSharedPtr<FJsonObject> ErrorResponse = MakeShared<FJsonObject>();
+		ErrorResponse->SetBoolField(TEXT("ok"), false);
+		ErrorResponse->SetStringField(TEXT("op"), TEXT("ui.get_widget"));
+		ErrorResponse->SetStringField(TEXT("error"), TEXT("Missing required parameter: path"));
+
+		if (Request->HasField(TEXT("id")))
+		{
+			ErrorResponse->SetStringField(TEXT("id"), Request->GetStringField(TEXT("id")));
+		}
+
+		FString OutputString;
+		TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+			TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+		FJsonSerializer::Serialize(ErrorResponse.ToSharedRef(), Writer);
+		return OutputString;
+	}
+
+	FString Path = Request->GetStringField(TEXT("path"));
+	FString RequestId = Request->HasField(TEXT("id")) ? Request->GetStringField(TEXT("id")) : TEXT("");
+
+	// UI queries MUST run on Game Thread
+	TPromise<FString> Promise;
+	TFuture<FString> Future = Promise.GetFuture();
+
+	AsyncTask(ENamedThreads::GameThread, [this, Path, RequestId, Promise = MoveTemp(Promise)]() mutable {
+		TSharedPtr<FJsonObject> Response = MakeShared<FJsonObject>();
+
+		if (!RequestId.IsEmpty())
+		{
+			Response->SetStringField(TEXT("id"), RequestId);
+		}
+
+		Response->SetStringField(TEXT("op"), TEXT("ui.get_widget"));
+
+		// Check if Slate application is available
+		if (!FSlateApplication::IsInitialized())
+		{
+			Response->SetBoolField(TEXT("ok"), false);
+			Response->SetStringField(TEXT("error"), TEXT("Slate application not initialized"));
+
+			FString OutputString;
+			TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+				TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+			FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+			Promise.SetValue(OutputString);
+			return;
+		}
+
+		// Find widget by path
+		TSharedPtr<SWidget> FoundWidget = FindWidgetByPath(Path);
+
+		if (!FoundWidget.IsValid())
+		{
+			Response->SetBoolField(TEXT("ok"), false);
+			Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Widget not found: %s"), *Path));
+			Response->SetStringField(TEXT("path"), Path);
+
+			FString OutputString;
+			TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+				TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+			FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+			Promise.SetValue(OutputString);
+			return;
+		}
+
+		// Serialize the found widget (depth=1 to include immediate children)
+		TSharedPtr<FJsonObject> WidgetObj = SerializeWidget(FoundWidget, 2, 0);
+
+		Response->SetBoolField(TEXT("ok"), true);
+		Response->SetStringField(TEXT("path"), Path);
+		Response->SetObjectField(TEXT("widget"), WidgetObj);
+
+		// Serialize response
+		FString OutputString;
+		TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+			TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+		FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+		Promise.SetValue(OutputString);
+	});
+
+	// Wait for Game Thread to complete
+	return Future.Get();
+}
+
+TSharedPtr<SWidget> FUEServerRPC::FindWidgetByPath(const FString& Path)
+{
+	// MUST be called from Game Thread
+	check(IsInGameThread());
+
+	// Split path by "/"
+	TArray<FString> PathComponents;
+	Path.ParseIntoArray(PathComponents, TEXT("/"), true);
+
+	if (PathComponents.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	// Get all top-level windows
+	TArray<TSharedRef<SWindow>> Windows;
+	FSlateApplication::Get().GetAllVisibleWindowsOrdered(Windows);
+
+	// Search for widget matching the first path component in windows
+	TSharedPtr<SWidget> CurrentWidget = nullptr;
+
+	// Try to find window matching first component
+	for (const TSharedRef<SWindow>& Window : Windows)
+	{
+		FString WidgetType = Window->GetTypeAsString();
+		FString AccessibleText = Window->GetAccessibleText().ToString();
+
+		// Match by type or text
+		if (WidgetType.Contains(PathComponents[0]) || AccessibleText.Contains(PathComponents[0]))
+		{
+			CurrentWidget = Window;
+			break;
+		}
+	}
+
+	if (!CurrentWidget.IsValid())
+	{
+		return nullptr;
+	}
+
+	// Traverse remaining path components
+	for (int32 i = 1; i < PathComponents.Num(); ++i)
+	{
+		const FString& Component = PathComponents[i];
+		TSharedPtr<SWidget> NextWidget = nullptr;
+
+		// Search children for matching widget
+		FChildren* Children = CurrentWidget->GetChildren();
+		if (Children && Children->Num() > 0)
+		{
+			for (int32 j = 0; j < Children->Num(); ++j)
+			{
+				TSharedRef<SWidget> ChildWidget = Children->GetChildAt(j);
+				FString ChildType = ChildWidget->GetTypeAsString();
+				FString ChildText = ChildWidget->GetAccessibleText().ToString();
+
+				// Match by type or text
+				if (ChildType.Contains(Component) || ChildText.Contains(Component))
+				{
+					NextWidget = ChildWidget;
+					break;
+				}
+			}
+		}
+
+		if (!NextWidget.IsValid())
+		{
+			// Path component not found
+			return nullptr;
+		}
+
+		CurrentWidget = NextWidget;
+	}
+
+	return CurrentWidget;
 }

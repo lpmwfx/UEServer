@@ -3036,4 +3036,5 @@
   Runtime/Json/Public/Serialization/JsonSerializer.h \
   Runtime/Slate/Public/Framework/Application/SlateApplication.h \
   Runtime/SlateCore/Public/Widgets/SWidget.h \
-  Runtime/SlateCore/Public/Widgets/SWindow.h
+  Runtime/SlateCore/Public/Widgets/SWindow.h \
+  Runtime/Core/Public/Async/Async.h
