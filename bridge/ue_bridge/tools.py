@@ -202,12 +202,101 @@ async def ue_ui_get_tree(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
     return await call_ue("ui.get_tree", {"max_depth": max_depth}, ctx)
 
 
+async def ue_switchboard(args: dict[str, Any], ctx: ToolContext) -> UEResponse:
+    """
+    Get switchboard state showing all running UE instances.
+
+    Returns current state from ~/.ueserver/switchboard.json.
+    Makes port discovery transparent and debuggable.
+
+    Args:
+        args: Empty dict (no arguments required)
+        ctx: Tool context (not used - reads from file system)
+
+    Returns:
+        Response with switchboard state:
+            {
+                "ok": true,
+                "switchboard_path": "~/.ueserver/switchboard.json",
+                "instances": [
+                    {
+                        "pid": 12345,
+                        "port": 41319,
+                        "project": "path/to/project.uproject",
+                        "project_name": "MyProject",
+                        "started": "2025-12-27T12:37:51.526Z",
+                        "alive": true
+                    }
+                ],
+                "instance_count": 1
+            }
+
+        Each instance shows:
+            - pid: Process ID
+            - port: TCP port for RPC server
+            - project: Path to .uproject file
+            - project_name: Project name
+            - started: ISO 8601 timestamp
+            - alive: Whether process is still running
+    """
+    import json
+    import os
+    from pathlib import Path
+
+    # Get switchboard path
+    home = Path.home()
+    switchboard_path = home / ".ueserver" / "switchboard.json"
+
+    # Check if switchboard exists
+    if not switchboard_path.exists():
+        return {
+            "ok": False,
+            "error": "No switchboard file found",
+            "switchboard_path": str(switchboard_path),
+            "hint": "No UE instances are running with UEServer plugin",
+        }
+
+    # Read switchboard
+    try:
+        with open(switchboard_path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        return {
+            "ok": False,
+            "error": f"Failed to read switchboard: {str(e)}",
+            "switchboard_path": str(switchboard_path),
+        }
+
+    instances = data.get("instances", [])
+
+    # Check if each instance is alive
+    for instance in instances:
+        pid = instance.get("pid")
+        if pid and isinstance(pid, int):
+            # Check if process is running (via os.kill with signal 0)
+            try:
+                os.kill(pid, 0)
+                instance["alive"] = True
+            except (OSError, ProcessLookupError):
+                instance["alive"] = False
+        else:
+            instance["alive"] = False
+
+    return {
+        "ok": True,
+        "switchboard_path": str(switchboard_path),
+        "instances": instances,
+        "instance_count": len(instances),
+    }
+
+
 # Tool registry
 TOOL_HANDLERS: dict[str, ToolHandler] = {
     "ue.start": ue_start,
     "ue.ping": ue_ping,
     "ue.health": ue_health,
     "ue.ui.get_tree": ue_ui_get_tree,
+    "ue.switchboard": ue_switchboard,
 }
 
 TOOL_NAMES = sorted(TOOL_HANDLERS.keys())

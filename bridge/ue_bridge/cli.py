@@ -262,10 +262,11 @@ async def async_main() -> None:
             else:
                 filtered_args.append(arg)
 
-        # Special case: ue.start doesn't need port discovery
-        # It will start UE5 and return the port info
-        if filtered_args and filtered_args[0] == "ue.start":
-            # Create dummy context (won't be used by ue.start)
+        # Special cases: tools that don't need port discovery
+        # ue.start: starts UE5 and returns port info
+        # ue.switchboard: reads from file system
+        if filtered_args and filtered_args[0] in ("ue.start", "ue.switchboard"):
+            # Create dummy context (won't be used by these tools)
             ctx: ToolContext = {
                 "host": "127.0.0.1",
                 "port": 0,
