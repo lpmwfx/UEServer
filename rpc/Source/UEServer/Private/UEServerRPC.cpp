@@ -12,6 +12,9 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWidget.h"
+#include "Widgets/SWindow.h"
 
 FUEServerRPC::FUEServerRPC()
 	: ListenerSocket(nullptr)
@@ -415,6 +418,10 @@ FString FUEServerRPC::ProcessRequest(const FString& RequestJson)
 	{
 		return HandlePing(JsonObject);
 	}
+	else if (Op == TEXT("ui.get_tree"))
+	{
+		return HandleUIGetTree(JsonObject);
+	}
 
 	// Unknown operation
 	TSharedPtr<FJsonObject> ErrorResponse = MakeShared<FJsonObject>();
@@ -448,4 +455,130 @@ FString FUEServerRPC::HandlePing(const TSharedPtr<FJsonObject>& Request)
 		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
 	FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
 	return OutputString;
+}
+
+FString FUEServerRPC::HandleUIGetTree(const TSharedPtr<FJsonObject>& Request)
+{
+	// Get optional parameters
+	int32 MaxDepth = 10; // Default max depth
+	if (Request->HasField(TEXT("max_depth")))
+	{
+		MaxDepth = Request->GetIntegerField(TEXT("max_depth"));
+	}
+
+	// Build response
+	TSharedPtr<FJsonObject> Response = MakeShared<FJsonObject>();
+
+	// Add id if present in request
+	if (Request->HasField(TEXT("id")))
+	{
+		Response->SetStringField(TEXT("id"), Request->GetStringField(TEXT("id")));
+	}
+
+	Response->SetStringField(TEXT("op"), TEXT("ui.get_tree"));
+
+	// Check if Slate application is available
+	if (!FSlateApplication::IsInitialized())
+	{
+		Response->SetBoolField(TEXT("ok"), false);
+		Response->SetStringField(TEXT("error"), TEXT("Slate application not initialized"));
+
+		FString OutputString;
+		TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+			TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+		FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+		return OutputString;
+	}
+
+	// Get all top-level windows
+	TArray<TSharedRef<SWindow>> Windows;
+	FSlateApplication::Get().GetAllVisibleWindowsOrdered(Windows);
+
+	// Serialize windows as array
+	TArray<TSharedPtr<FJsonValue>> WindowsArray;
+	for (const TSharedRef<SWindow>& Window : Windows)
+	{
+		TSharedPtr<FJsonObject> WindowObj = SerializeWidget(Window, MaxDepth, 0);
+		if (WindowObj.IsValid())
+		{
+			WindowsArray.Add(MakeShared<FJsonValueObject>(WindowObj));
+		}
+	}
+
+	Response->SetBoolField(TEXT("ok"), true);
+	Response->SetArrayField(TEXT("windows"), WindowsArray);
+	Response->SetNumberField(TEXT("window_count"), Windows.Num());
+
+	// Serialize response
+	FString OutputString;
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&OutputString);
+	FJsonSerializer::Serialize(Response.ToSharedRef(), Writer);
+	return OutputString;
+}
+
+TSharedPtr<FJsonObject> FUEServerRPC::SerializeWidget(TSharedPtr<SWidget> Widget, int32 MaxDepth, int32 CurrentDepth)
+{
+	if (!Widget.IsValid() || CurrentDepth >= MaxDepth)
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> WidgetObj = MakeShared<FJsonObject>();
+
+	// Widget type (class name)
+	FString WidgetType = Widget->GetTypeAsString();
+	WidgetObj->SetStringField(TEXT("type"), WidgetType);
+
+	// Visibility
+	EVisibility Visibility = Widget->GetVisibility();
+	bool bIsVisible = Visibility.IsVisible();
+	WidgetObj->SetBoolField(TEXT("visible"), bIsVisible);
+
+	// Enabled state
+	bool bIsEnabled = Widget->IsEnabled();
+	WidgetObj->SetBoolField(TEXT("enabled"), bIsEnabled);
+
+	// Geometry (size and position)
+	FGeometry Geometry = Widget->GetCachedGeometry();
+	TSharedPtr<FJsonObject> GeometryObj = MakeShared<FJsonObject>();
+	FVector2D Size = Geometry.GetLocalSize();
+	FVector2D AbsolutePosition = Geometry.GetAbsolutePosition();
+
+	GeometryObj->SetNumberField(TEXT("x"), AbsolutePosition.X);
+	GeometryObj->SetNumberField(TEXT("y"), AbsolutePosition.Y);
+	GeometryObj->SetNumberField(TEXT("width"), Size.X);
+	GeometryObj->SetNumberField(TEXT("height"), Size.Y);
+	WidgetObj->SetObjectField(TEXT("geometry"), GeometryObj);
+
+	// Try to get accessible text (for screen readers and debugging)
+	FString AccessibleText = Widget->GetAccessibleText().ToString();
+	if (!AccessibleText.IsEmpty())
+	{
+		WidgetObj->SetStringField(TEXT("text"), AccessibleText);
+	}
+
+	// Serialize children recursively
+	FChildren* Children = Widget->GetChildren();
+	if (Children && Children->Num() > 0)
+	{
+		TArray<TSharedPtr<FJsonValue>> ChildrenArray;
+		for (int32 i = 0; i < Children->Num(); ++i)
+		{
+			TSharedRef<SWidget> ChildWidget = Children->GetChildAt(i);
+			TSharedPtr<FJsonObject> ChildObj = SerializeWidget(ChildWidget, MaxDepth, CurrentDepth + 1);
+			if (ChildObj.IsValid())
+			{
+				ChildrenArray.Add(MakeShared<FJsonValueObject>(ChildObj));
+			}
+		}
+		WidgetObj->SetArrayField(TEXT("children"), ChildrenArray);
+		WidgetObj->SetNumberField(TEXT("child_count"), ChildrenArray.Num());
+	}
+	else
+	{
+		WidgetObj->SetNumberField(TEXT("child_count"), 0);
+	}
+
+	return WidgetObj;
 }

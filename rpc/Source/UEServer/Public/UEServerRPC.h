@@ -60,6 +60,12 @@ private:
 	/** RPC handler: ping operation */
 	FString HandlePing(const TSharedPtr<FJsonObject>& Request);
 
+	/** RPC handler: get UI widget tree */
+	FString HandleUIGetTree(const TSharedPtr<FJsonObject>& Request);
+
+	/** Helper: Serialize widget to JSON recursively */
+	TSharedPtr<FJsonObject> SerializeWidget(TSharedPtr<SWidget> Widget, int32 MaxDepth, int32 CurrentDepth);
+
 private:
 	/** Listener socket */
 	FSocket* ListenerSocket;
